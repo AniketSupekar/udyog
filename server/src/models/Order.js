@@ -48,9 +48,10 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["CREATED", "SCHEDULED", "DISPATCHED", "DELIVERED"],
+      enum: ["CREATED", "PENDING", "DELIVERED"],
       default: "CREATED"
-    }
+    },
+    isDeleted: { type: Boolean, default: false }
   },
   {
     timestamps: true

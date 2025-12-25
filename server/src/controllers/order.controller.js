@@ -11,17 +11,30 @@ export const createOrder = async (req, res) => {
       advancePaid = 0
     } = req.body;
 
-    // Basic validation
-    if (!customer || !orderDate || !deliveryDate || !quantity || !rate) {
+    // Validation
+    if (
+      !customer ||
+      !orderDate ||
+      !deliveryDate ||
+      quantity == null ||
+      rate == null
+    ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Core business logic
+    if (quantity <= 0 || rate <= 0) {
+      return res.status(400).json({
+        message: "Quantity and rate must be greater than zero"
+      });
+    }
+
     const totalAmount = quantity * rate;
     const remainingAmount = totalAmount - advancePaid;
 
     if (remainingAmount < 0) {
-      return res.status(400).json({ message: "Advance cannot exceed total" });
+      return res.status(400).json({
+        message: "Advance cannot exceed total amount"
+      });
     }
 
     const order = await Order.create({
@@ -32,19 +45,22 @@ export const createOrder = async (req, res) => {
       rate,
       totalAmount,
       advancePaid,
-      remainingAmount
+      remainingAmount,
+      status: "CREATED" // ✅ FIXED
     });
 
     res.status(201).json(order);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 };
 
 export const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find().sort({ deliveryDate: 1 });
-    res.json(orders);
+    const filter = req.query.showDeleted === "true" ? {} : { isDeleted: false };
+    const orders = await Order.find(filter).sort({ deliveryDate: 1 });
+    res.status(200).json(orders);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -58,8 +74,62 @@ export const getOrderById = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    res.json(order);
+    res.status(200).json(order);
   } catch (error) {
-    res.status(500).json({ message: "Invalid order ID" });
+    res.status(400).json({ message: "Invalid order ID" });
+  }
+};
+
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Block changes if delivered
+    if (order.status === "DELIVERED") {
+      return res.status(400).json({
+        message: "Delivered orders cannot be modified"
+      });
+    }
+
+    // Validate transitions
+    const allowedTransitions = {
+      CREATED: ["PENDING"],
+      PENDING: ["DELIVERED"]
+    };
+
+    if (!allowedTransitions[order.status]?.includes(status)) {
+      return res.status(400).json({
+        message: `Invalid status transition from ${order.status} to ${status}`
+      });
+    }
+
+    order.status = status;
+    await order.save();
+
+    res.status(200).json(order);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const softDeleteOrder = async (req, res) => {
+  try {
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { isDeleted: true },
+      { new: true }
+    );
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    res.status(200).json({ message: "Order deleted", order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
