@@ -8,9 +8,11 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://balaji-nursery.onrender.com/",
+        target: "https://nursery-app-iin1.onrender.com",
         changeOrigin: true
       }
     }
   }
 });
+
+//http://localhost:5000
