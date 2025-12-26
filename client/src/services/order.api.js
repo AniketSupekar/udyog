@@ -1,11 +1,12 @@
 const API_BASE_URL = "https://nursery-app-iin1.onrender.com/api/orders";
 
 export const fetchOrders = async ({ showDeleted = false } = {}) => {
-  const res = await fetch(`/api/orders?showDeleted=${showDeleted}`);
+  const res = await fetch(
+    `${API_BASE_URL}?showDeleted=${showDeleted}`
+  );
   if (!res.ok) throw new Error("Failed to fetch orders");
   return res.json();
 };
-
 
 export const fetchOrderById = async (id) => {
   const res = await fetch(`${API_BASE_URL}/${id}`);
@@ -14,7 +15,7 @@ export const fetchOrderById = async (id) => {
 };
 
 export const createOrder = async (data) => {
-  const res = await fetch(`/api/orders`, {
+  const res = await fetch(`${API_BASE_URL}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -25,7 +26,7 @@ export const createOrder = async (data) => {
 };
 
 export const updateOrderStatus = async (id, status) => {
-  const res = await fetch(`/api/orders/${id}/status`, {
+  const res = await fetch(`${API_BASE_URL}/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status })
@@ -40,13 +41,15 @@ export const updateOrderStatus = async (id, status) => {
 };
 
 export const softDeleteOrder = async (id) => {
-  const res = await fetch(`/api/orders/${id}/delete`, { method: "PATCH" });
+  const res = await fetch(`${API_BASE_URL}/${id}/delete`, {
+    method: "PATCH"
+  });
   if (!res.ok) throw new Error("Failed to delete order");
-  return await res.json();
+  return res.json();
 };
 
 export const updateOrderDetails = async (id, data) => {
-  const res = await fetch(`/api/orders/${id}`, {
+  const res = await fetch(`${API_BASE_URL}/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
