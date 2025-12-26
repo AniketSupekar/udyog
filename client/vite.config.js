@@ -8,11 +8,9 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://nursery-app-iin1.onrender.com",
+        target: "http://localhost:5000",
         changeOrigin: true
       }
     }
   }
 });
-
-//http://localhost:5000
