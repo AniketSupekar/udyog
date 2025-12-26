@@ -14,7 +14,7 @@ export const fetchOrderById = async (id) => {
 };
 
 export const createOrder = async (data) => {
-  const res = await fetch("http://localhost:5000/api/orders", {
+  const res = await fetch(`/api/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -43,4 +43,19 @@ export const softDeleteOrder = async (id) => {
   const res = await fetch(`/api/orders/${id}/delete`, { method: "PATCH" });
   if (!res.ok) throw new Error("Failed to delete order");
   return await res.json();
+};
+
+export const updateOrderDetails = async (id, data) => {
+  const res = await fetch(`/api/orders/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message);
+  }
+
+  return res.json();
 };

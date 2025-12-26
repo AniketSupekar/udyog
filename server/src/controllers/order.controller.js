@@ -133,3 +133,54 @@ export const softDeleteOrder = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const updateOrderDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // ❌ Block editing if delivered or deleted
+    if (order.status === "DELIVERED" || order.isDeleted) {
+      return res.status(400).json({
+        message: "This order cannot be edited"
+      });
+    }
+
+    const {
+      customer,
+      orderDate,
+      deliveryDate,
+      quantity,
+      rate,
+      advancePaid
+    } = req.body;
+
+    // ✅ Update only fields that are sent
+    if (customer) order.customer = customer;
+    if (orderDate) order.orderDate = orderDate;
+    if (deliveryDate) order.deliveryDate = deliveryDate;
+    if (quantity != null) order.quantity = quantity;
+    if (rate != null) order.rate = rate;
+    if (advancePaid != null) order.advancePaid = advancePaid;
+
+    // ✅ Recalculate amounts
+    order.totalAmount = order.quantity * order.rate;
+    order.remainingAmount = order.totalAmount - order.advancePaid;
+
+    if (order.remainingAmount < 0) {
+      return res.status(400).json({
+        message: "Advance cannot exceed total amount"
+      });
+    }
+
+    await order.save();
+    res.status(200).json(order);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
