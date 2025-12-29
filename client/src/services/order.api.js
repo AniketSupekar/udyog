@@ -1,8 +1,8 @@
 const API_BASE_URL =
-  import.meta.env.PROD
+  import.meta.env.MODE === "production"
     ? "https://nursery-app-iin1.onrender.com/api/orders"
     : "/api/orders";
-
+    
 export const fetchOrders = async ({ showDeleted = false } = {}) => {
   const res = await fetch(
     `${API_BASE_URL}?showDeleted=${showDeleted}`
