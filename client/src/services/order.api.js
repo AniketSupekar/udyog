@@ -1,4 +1,7 @@
-const API_BASE_URL = "/api/orders";
+const API_BASE_URL =
+  import.meta.env.PROD
+    ? "https://nursery-app-iin1.onrender.com/api/orders"
+    : "/api/orders";
 
 export const fetchOrders = async ({ showDeleted = false } = {}) => {
   const res = await fetch(
