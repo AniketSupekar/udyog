@@ -3,13 +3,27 @@ const API_BASE_URL =
     ? "https://nursery-app-iin1.onrender.com/api/orders"
     : "/api/orders";
     
-export const fetchOrders = async ({ showDeleted = false } = {}) => {
-  const res = await fetch(
-    `${API_BASE_URL}?showDeleted=${showDeleted}`
-  );
+export const fetchOrders = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  status = "",
+  showDeleted = false
+} = {}) => {
+  const params = new URLSearchParams({
+    page,
+    limit,
+    search,
+    status,
+    showDeleted
+  });
+
+  const res = await fetch(`${API_BASE_URL}?${params.toString()}`);
+
   if (!res.ok) throw new Error("Failed to fetch orders");
   return res.json();
 };
+
 
 export const fetchOrderById = async (id) => {
   const res = await fetch(`${API_BASE_URL}/${id}`);

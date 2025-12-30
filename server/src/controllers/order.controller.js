@@ -58,13 +58,56 @@ export const createOrder = async (req, res) => {
 
 export const getAllOrders = async (req, res) => {
   try {
-    const filter = req.query.showDeleted === "true" ? {} : { isDeleted: false };
-    const orders = await Order.find(filter).sort({ deliveryDate: 1 });
-    res.status(200).json(orders);
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      status = "",
+      showDeleted = "false"
+    } = req.query;
+
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+
+    const filter = {};
+
+    // 🔹 Soft delete filter
+    if (showDeleted !== "true") {
+      filter.isDeleted = false;
+    }
+
+    // 🔹 Status filter
+    if (status) {
+      filter.status = status;
+    }
+
+    // 🔹 Search (customer name or phone)
+    if (search) {
+      filter.$or = [
+        { "customer.name": { $regex: search, $options: "i" } },
+        { "customer.phone": { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const total = await Order.countDocuments(filter);
+
+    const orders = await Order.find(filter)
+      .sort({ deliveryDate: 1 })
+      .skip((pageNumber - 1) * limitNumber)
+      .limit(limitNumber);
+
+    res.status(200).json({
+      data: orders,
+      total,
+      page: pageNumber,
+      limit: limitNumber,
+      totalPages: Math.ceil(total / limitNumber)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const getOrderById = async (req, res) => {
   try {
