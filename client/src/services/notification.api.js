@@ -1,7 +1,7 @@
 const BASE_URL =
   import.meta.env.MODE === "development"
     ? "/api/notifications" 
-    : "https://your-backend-render-url.onrender.com/api/notifications";
+    : "https://nursery-app-iin1.onrender.com/api/notifications";
 
 export async function getNotifications() {
   const res = await fetch(BASE_URL);
