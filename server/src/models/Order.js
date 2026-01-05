@@ -46,6 +46,11 @@ const orderSchema = new mongoose.Schema(
       required: true
     },
 
+    notificationSent: {
+      type: Boolean,
+      default: false
+    },
+
     status: {
       type: String,
       enum: ["CREATED", "PENDING", "DELIVERED"],

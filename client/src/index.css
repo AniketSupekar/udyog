@@ -7,3 +7,14 @@
   @apply w-full px-3 py-2 border border-gray-300 rounded-md text-sm
   focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500;
 }
+
+@keyframes slideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
