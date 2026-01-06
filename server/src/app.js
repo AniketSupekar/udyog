@@ -22,19 +22,6 @@ app.get("/", (req, res) => {
   res.send("API running");
 });
 
-// ================= CRON JOB ================= //
-// Runs every day at 08:00 AM server time
-// cron.schedule("0 8 * * *", async () => {
-//   console.log("🔔 Running daily notification job...");
-
-//   try {
-//     const result = await createTomorrowDeliveryNotifications();
-//     console.log(`Notifications created: ${result.created}`);
-//   } catch (err) {
-//     console.error("Error running notification job:", err);
-//   }
-// });
-
 cron.schedule(
   "0 8 * * *",
   async () => {
@@ -51,8 +38,5 @@ cron.schedule(
     timezone: "Asia/Kolkata"
   }
 );
-
-
-createTomorrowDeliveryNotifications().then(res => console.log("Test Result:", res));
 
 export default app;
