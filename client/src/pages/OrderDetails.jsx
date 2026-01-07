@@ -94,7 +94,7 @@ export default function OrderDetails() {
   const isEditable = order.status !== "DELIVERED" && !order.isDeleted;
 
   return (
-    <Layout>
+    <>
       <Header />
 
       <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
@@ -354,6 +354,6 @@ export default function OrderDetails() {
           </div>
         </div>
       </div>
-    </Layout>
+      </>
   );
 }
