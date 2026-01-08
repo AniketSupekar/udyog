@@ -45,11 +45,24 @@ export default function NotificationPanel({
 
     return (
         <div
-  ref={panelRef}
-  className="absolute right-0 top-12 w-96 max-h-[28rem] bg-white border border-gray-200 shadow-xl rounded-lg p-4 overflow-y-auto z-50
-             transform transition-transform duration-300 origin-top scale-y-0 scale-y-100"
-  style={{ animation: "slideDown 0.2s ease-out forwards" }}
->
+            ref={panelRef}
+            className="
+    fixed sm:absolute
+    top-16 sm:top-12
+    left-4 right-4 sm:left-auto sm:right-0
+    sm:w-96
+    max-h-[28rem]
+    bg-white
+    border border-gray-200
+    shadow-xl
+    rounded-lg
+    p-4
+    overflow-y-auto
+    z-50
+    transform origin-top
+  "
+            style={{ animation: "slideDown 0.2s ease-out forwards" }}
+        >
 
 
             <div className="flex justify-between items-center mb-2">
