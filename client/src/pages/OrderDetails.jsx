@@ -95,7 +95,7 @@ export default function OrderDetails() {
 
   return (
     <>
-      <Header />
+      {/* <Header /> */}
 
       <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
         {/* ================= HEADER ================= */}

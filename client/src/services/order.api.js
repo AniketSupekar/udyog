@@ -8,6 +8,7 @@ export const fetchOrders = async ({
   limit = 10,
   search = "",
   status = "",
+  filter = "",      
   showDeleted = false
 } = {}) => {
   const params = new URLSearchParams({
@@ -18,11 +19,15 @@ export const fetchOrders = async ({
     showDeleted
   });
 
-  const res = await fetch(`${API_BASE_URL}?${params.toString()}`);
+  if (filter) {
+    params.append("filter", filter);
+  }
 
+  const res = await fetch(`${API_BASE_URL}?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch orders");
   return res.json();
 };
+
 
 
 export const fetchOrderById = async (id) => {
