@@ -5,6 +5,7 @@ import OrderDetails from "./pages/OrderDetails";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import { useAuth } from "./context/AuthContext";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   const { user, loading } = useAuth();
@@ -24,19 +25,21 @@ function App() {
         {/* Public route */}
         <Route
           path="/login"
-          element={user ? <Navigate to="/" /> : <Login />}
+          element={user ? <Navigate to="/dashboard" /> : <Login />}
         />
 
         {/* Protected routes */}
-        <Route
-          path="/"
-          element={user ? <Layout /> : <Navigate to="/login" />}
-        >
-          {/* Nested routes */}
-          <Route index element={<OrdersList />} />
-          <Route path="create" element={<CreateOrder />} />
+        <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
+          {/* Default route after login */}
+          <Route index element={<Navigate to="/dashboard" />} />
+
+          <Route path="order" element={<OrdersList />} />
           <Route path="order/:id" element={<OrderDetails />} />
+
+          <Route path="create" element={<CreateOrder />} />
+          <Route path="dashboard" element={<Dashboard />} />
         </Route>
+
       </Routes>
     </BrowserRouter>
   );

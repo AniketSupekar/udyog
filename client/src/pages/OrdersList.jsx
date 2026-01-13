@@ -1,272 +1,313 @@
 import { useEffect, useState, useRef } from "react";
 import { fetchOrders } from "../services/order.api";
-import { Link } from "react-router-dom";
-import Header from "../components/Header";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
-import Layout from "../components/Layout";
-
 
 export default function OrdersList() {
-    const [orders, setOrders] = useState([]);
-    const [initialLoading, setInitialLoading] = useState(true);
-    const [fetching, setFetching] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter = searchParams.get("filter"); // upcoming | overdue | due-today | null
+  const status = searchParams.get("status") || "";
 
-    const [showDeleted, setShowDeleted] = useState(false);
-    const [search, setSearch] = useState("");
-    const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [status, setStatus] = useState("");
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
+  const navigate = useNavigate();
 
-    const debounceRef = useRef(null);
+  const [orders, setOrders] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
 
-    // Debounce search
-    useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-        debounceRef.current = setTimeout(() => {
-            setPage(1);
-            setDebouncedSearch(search);
-        }, 400);
+  const debounceRef = useRef(null);
 
-        return () => clearTimeout(debounceRef.current);
-    }, [search]);
+  /* ================= DASHBOARD CONTEXT ================= */
+  const isDashboardView = Boolean(filter || status);
 
-    const loadOrders = async (isInitial = false) => {
-        isInitial ? setInitialLoading(true) : setFetching(true);
+  const contextTitle = (() => {
+    if (filter === "overdue") return "Overdue Orders";
+    if (filter === "due-today") return "Due Today Orders";
+    if (filter === "upcoming") return "Upcoming Orders";
+    if (status) return `${status.charAt(0)}${status.slice(1).toLowerCase()} Orders`;
+    return null;
+  })();
 
-        try {
-            const res = await fetchOrders({
-                page,
-                limit: 10,
-                search: debouncedSearch,
-                status,
-                showDeleted,
-            });
+  /* ================= SEARCH DEBOUNCE ================= */
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
 
-            setOrders(res.data || []);
-            setTotalPages(res.totalPages || 1);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setInitialLoading(false);
-            setFetching(false);
-        }
-    };
+    debounceRef.current = setTimeout(() => {
+      setPage(1);
+      setDebouncedSearch(search);
+    }, 400);
 
-    
+    return () => clearTimeout(debounceRef.current);
+  }, [search]);
 
-    useEffect(() => {
-        loadOrders(true);
-    }, []);
+  /* ================= DATA FETCH ================= */
+  const loadOrders = async (isInitial = false) => {
+    isInitial ? setInitialLoading(true) : setFetching(true);
 
-    useEffect(() => {
-        if (!initialLoading) loadOrders();
-    }, [debouncedSearch, status, page, showDeleted]);
+    try {
+      const res = await fetchOrders({
+        page,
+        limit: 10,
+        search: debouncedSearch,
+        status,
+        showDeleted,
+        filter,
+      });
 
-    return (
+      setOrders(res.data || []);
+      setTotalPages(res.totalPages || 1);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInitialLoading(false);
+      setFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders(page === 1);
+  }, [debouncedSearch, status, filter, page, showDeleted]);
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      {/* ================= TOP BAR ================= */}
+      <div className="flex flex-col md:flex-row md:justify-between gap-4">
+        <div>
+          <button
+  onClick={() => navigate(-1)}
+  className="text-sm text-green-600 hover:underline mb-1"
+>
+  ← Back to Dashboard
+</button>
+
+
+          <h2 className="text-xl font-semibold text-gray-800">
+            {contextTitle || "Orders"}
+          </h2>
+
+          <p className="text-sm text-gray-500">
+            {contextTitle
+              ? "Showing filtered orders from dashboard"
+              : "Manage and track all customer orders"}
+          </p>
+        </div>
+
+        {/* ================= ACTIONS ================= */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            type="text"
+            placeholder="Search customer / phone"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border px-3 py-2 rounded-md text-sm"
+          />
+
+          <select
+            value={status}
+            onChange={(e) => {
+              setPage(1);
+              const value = e.target.value;
+              const params = Object.fromEntries(searchParams.entries());
+
+              if (value) params.status = value;
+              else delete params.status;
+
+              setSearchParams(params);
+            }}
+            className="border px-3 py-2 rounded-md text-sm"
+          >
+            <option value="">All Status</option>
+            <option value="CREATED">CREATED</option>
+            <option value="PENDING">PENDING</option>
+            <option value="DELIVERED">DELIVERED</option>
+          </select>
+
+          {!isDashboardView && (
+            <>
+              <button
+                onClick={() => {
+                  setPage(1);
+                  setShowDeleted(!showDeleted);
+                }}
+                className="bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-md hover:bg-gray-300 transition"
+              >
+                {showDeleted ? "Hide Deleted" : "Show Deleted"}
+              </button>
+
+              <Link
+                to="/create"
+                className="bg-green-600 text-white text-sm px-4 py-2 rounded-md hover:bg-green-700 transition"
+              >
+                + Create Order
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ================= CONTENT ================= */}
+      {initialLoading ? (
+        <div className="p-6 text-center text-gray-500">Loading orders...</div>
+      ) : orders.length === 0 ? (
+        <p className="text-center text-gray-500">No orders found.</p>
+      ) : (
         <>
-            <Header />
+          {fetching && (
+            <p className="text-sm text-gray-400 text-center">
+              Updating results…
+            </p>
+          )}
 
-            <div className="p-4 md:p-6 space-y-6">
-                {/* ================= TOP BAR ================= */}
-                <div className="flex flex-col md:flex-row md:justify-between gap-4">
-                    <div>
-                        <h2 className="text-xl font-semibold text-gray-800">Orders</h2>
-                        <p className="text-sm text-gray-500">
-                            Manage and track all customer orders
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3 items-center">
-                        <input
-                            type="text"
-                            placeholder="Search customer / phone"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="border px-3 py-2 rounded-md text-sm"
-                        />
-
-                        <select
-                            value={status}
-                            onChange={(e) => {
-                                setPage(1);
-                                setStatus(e.target.value);
-                            }}
-                            className="border px-3 py-2 rounded-md text-sm"
-                        >
-                            <option value="">All Status</option>
-                            <option value="CREATED">CREATED</option>
-                            <option value="PENDING">PENDING</option>
-                            <option value="DELIVERED">DELIVERED</option>
-                        </select>
-
-                        <button
-                            onClick={() => {
-                                setPage(1);
-                                setShowDeleted(!showDeleted);
-                            }}
-                            className="bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-md hover:bg-gray-300 transition"
-                        >
-                            {showDeleted ? "Hide Deleted" : "Show Deleted"}
-                        </button>
-
-                        <Link
-                            to="/create"
-                            className="bg-green-600 text-white text-sm px-4 py-2 rounded-md hover:bg-green-700 transition"
-                        >
-                            + Create Order
-                        </Link>
-                    </div>
+          {/* MOBILE VIEW */}
+          <div className="space-y-4 md:hidden">
+            {orders.map((order) => (
+              <div
+                key={order._id}
+                className={`bg-white rounded-xl shadow-sm p-4 space-y-3 ${
+                  order.isDeleted ? "bg-gray-100 opacity-60" : ""
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p
+                      className={`text-sm font-medium ${
+                        order.isDeleted
+                          ? "line-through text-gray-500"
+                          : "text-gray-800"
+                      }`}
+                    >
+                      {order.customer.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Delivery: {order.deliveryDate.slice(0, 10)}
+                    </p>
+                  </div>
+                  <StatusBadge status={order.status} />
                 </div>
 
-                {/* ================= CONTENT ================= */}
-                {initialLoading ? (
-                    <div className="p-6 text-center text-gray-500">
-                        Loading orders...
-                    </div>
-                ) : orders.length === 0 ? (
-                    <p className="text-center text-gray-500">No orders found.</p>
-                ) : (
-                    <>
-                        {fetching && (
-                            <p className="text-sm text-gray-400 text-center">
-                                Updating results…
-                            </p>
-                        )}
+                <div className="flex justify-between items-center">
+                  <p
+                    className={`text-lg font-semibold ${
+                      order.isDeleted
+                        ? "text-gray-400 line-through"
+                        : "text-gray-900"
+                    }`}
+                  >
+                    ₹ {order.totalAmount}
+                  </p>
+                  <Link
+                    to={`/order/${order._id}`}
+                    className={`text-sm font-medium ${
+                      order.isDeleted
+                        ? "text-gray-400"
+                        : "text-green-600"
+                    }`}
+                  >
+                    View →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
 
-                        {/* MOBILE VIEW */}
-                        <div className="space-y-4 md:hidden">
-                            {orders.map((order) => (
-                                <div
-                                    key={order._id}
-                                    className={`bg-white rounded-xl shadow-sm p-4 space-y-3 ${order.isDeleted ? "bg-gray-100 opacity-60" : ""
-                                        }`}
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className={`text-sm font-medium ${order.isDeleted
-                                                ? "line-through text-gray-500"
-                                                : "text-gray-800"
-                                                }`}>
-                                                {order.customer.name}
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                                Delivery: {order.deliveryDate.slice(0, 10)}
-                                            </p>
-                                        </div>
-                                        <StatusBadge status={order.status} />
-                                    </div>
+          {/* DESKTOP VIEW */}
+          <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+            <table className="w-full border-collapse">
+              <thead className="bg-gray-50 text-gray-600 text-sm">
+                <tr>
+                  <th className="text-left px-6 py-4 border-b border-r border-gray-200">
+                    Customer
+                  </th>
+                  <th className="text-left px-6 py-4 border-b border-r border-gray-200">
+                    Delivery Date
+                  </th>
+                  <th className="text-right px-6 py-4 border-b border-r border-gray-200">
+                    Total
+                  </th>
+                  <th className="text-left px-6 py-4 border-b border-r border-gray-200">
+                    Status
+                  </th>
+                  <th className="text-center px-6 py-4 border-b border-gray-200">
+                    Action
+                  </th>
+                </tr>
+              </thead>
 
-                                    <div className="flex justify-between items-center">
-                                        <p className={`text-lg font-semibold ${order.isDeleted
-                                            ? "text-gray-400 line-through"
-                                            : "text-gray-900"
-                                            }`}>
-                                            ₹ {order.totalAmount}
-                                        </p>
-                                        <Link
-                                            to={`/order/${order._id}`}
-                                            className={`text-sm font-medium ${order.isDeleted
-                                                ? "text-gray-400"
-                                                : "text-green-600"
-                                                }`}
-                                        >
-                                            View →
-                                        </Link>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+              <tbody className="text-sm">
+                {orders.map((order) => (
+                  <tr
+                    key={order._id}
+                    className={`hover:bg-gray-50 transition ${
+                      order.isDeleted
+                        ? "bg-gray-100 opacity-60"
+                        : "bg-white"
+                    }`}
+                  >
+                    <td className="px-6 py-4 font-medium text-gray-800 border-b border-r border-gray-200">
+                      {order.customer.name}
+                    </td>
 
-                        {/* ================= DESKTOP VIEW ================= */}
-                        <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-                            <table className="w-full border-collapse">
-                                <thead className="bg-gray-50 text-gray-600 text-sm">
-                                    <tr>
-                                        <th className="text-left px-6 py-4 border-b border-r border-gray-200">
-                                            Customer
-                                        </th>
-                                        <th className="text-left px-6 py-4 border-b border-r border-gray-200">
-                                            Delivery Date
-                                        </th>
-                                        <th className="text-right px-6 py-4 border-b border-r border-gray-200">
-                                            Total
-                                        </th>
-                                        <th className="text-left px-6 py-4 border-b border-r border-gray-200">
-                                            Status
-                                        </th>
-                                        <th className="text-center px-6 py-4 border-b border-gray-200">
-                                            Action
-                                        </th>
-                                    </tr>
-                                </thead>
+                    <td className="px-6 py-4 text-gray-600 border-b border-r border-gray-200">
+                      {order.deliveryDate.slice(0, 10)}
+                    </td>
 
-                                <tbody className="text-sm">
-                                    {orders.map((order) => (
-                                        <tr
-                                            key={order._id}
-                                            className={`hover:bg-gray-50 transition ${order.isDeleted ? "bg-gray-100 opacity-60" : "bg-white"
-                                                }`}
-                                        >
-                                            <td className="px-6 py-4 font-medium text-gray-800 border-b border-r border-gray-200">
-                                                {order.customer.name}
-                                            </td>
+                    <td className="px-6 py-4 text-right font-semibold text-gray-900 border-b border-r border-gray-200">
+                      ₹ {order.totalAmount}
+                    </td>
 
-                                            <td className="px-6 py-4 text-gray-600 border-b border-r border-gray-200">
-                                                {order.deliveryDate.slice(0, 10)}
-                                            </td>
+                    <td className="px-6 py-4 border-b border-r border-gray-200">
+                      <StatusBadge status={order.status} />
+                    </td>
 
-                                            <td className="px-6 py-4 text-right font-semibold text-gray-900 border-b border-r border-gray-200">
-                                                ₹ {order.totalAmount}
-                                            </td>
+                    <td className="px-6 py-4 text-center border-b border-gray-200">
+                      <Link
+                        to={`/order/${order._id}`}
+                        className={`font-medium hover:underline ${
+                          order.isDeleted
+                            ? "text-gray-400"
+                            : "text-green-600"
+                        }`}
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-                                            <td className="px-6 py-4 border-b border-r border-gray-200">
-                                                <StatusBadge status={order.status} />
-                                            </td>
+          {/* PAGINATION */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4 pt-4">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+                className="px-3 py-1 border rounded disabled:opacity-50"
+              >
+                Prev
+              </button>
 
-                                            <td className="px-6 py-4 text-center border-b border-gray-200">
-                                                <Link
-                                                    to={`/order/${order._id}`}
-                                                    className={`text-green-600 font-medium hover:underline ${order.isDeleted ? "text-gray-400" : "text-green-600"
-                                                        }`}
-                                                >
-                                                    View
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+              <span className="text-sm text-gray-600">
+                Page {page} of {totalPages}
+              </span>
 
-                        {/* PAGINATION */}
-                        {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-4 pt-4">
-                                <button
-                                    disabled={page === 1}
-                                    onClick={() => setPage(page - 1)}
-                                    className="px-3 py-1 border rounded disabled:opacity-50"
-                                >
-                                    Prev
-                                </button>
-
-                                <span className="text-sm text-gray-600">
-                                    Page {page} of {totalPages}
-                                </span>
-
-                                <button
-                                    disabled={page === totalPages}
-                                    onClick={() => setPage(page + 1)}
-                                    className="px-3 py-1 border rounded disabled:opacity-50"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        )}
-                    </>
-                )}
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(page + 1)}
+                className="px-3 py-1 border rounded disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
+          )}
         </>
-    );
+      )}
+    </div>
+  );
 }

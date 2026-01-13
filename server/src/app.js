@@ -10,6 +10,7 @@ import { createTomorrowDeliveryNotifications } from "./services/notification.ser
 import "./models/User.js";
 import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
 
 dotenv.config();
 connectDB();
@@ -32,34 +33,44 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.get("/", (req, res) => {
   res.send("API running");
 });
 
-// ================= CRON JOB ================= //
-// Runs every day at 08:00 AM server time
-cron.schedule(
-  "0 8 * * *",
-  async () => {
-    console.log("🔔 Running daily notification job...");
-
-    try {
-      const result = await createTomorrowDeliveryNotifications();
-      console.log(`Notifications created: ${result.created}`);
-    } catch (err) {
-      console.error("Error running notification job:", err);
+if (process.env.NODE_ENV !== "production") {
+  cron.schedule(
+    "0 8 * * *",
+    async () => {
+      console.log("🔔 Running daily notification job (DEV)...");
+      try {
+        const result = await createTomorrowDeliveryNotifications();
+        console.log(`Notifications created: ${result.created}`);
+      } catch (err) {
+        console.error("Error running notification job:", err);
+      }
+    },
+    {
+      timezone: "Asia/Kolkata"
     }
-  },
-  {
-    timezone: "Asia/Kolkata"
-  }
-);
+  );
+}
 
-// ================= RUN IMMEDIATELY ON SERVER START ================= //
-// This ensures notifications for tomorrow's orders exist even if deployed after 08:00 AM
 createTomorrowDeliveryNotifications()
   .then((res) => console.log("Initial Test Result:", res))
   .catch((err) => console.error("Initial Notification Error:", err));
+
+// In production, your scheduler can hit this endpoint at 08:00
+app.post("/api/notifications/run", async (req, res) => {
+  try {
+    const result = await createTomorrowDeliveryNotifications();
+    console.log("🔔 Platform-scheduler triggered notifications:", result);
+    res.json({ success: true, created: result.created });
+  } catch (err) {
+    console.error("Error triggering notifications:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 export default app;

@@ -59,55 +59,53 @@ export const createOrder = async (req, res) => {
 
 export const getAllOrders = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search = "",
-      status = "",
-      showDeleted = "false"
-    } = req.query;
+    const { page = 1, limit = 10, search = "", status, filter, showDeleted = false } = req.query;
 
-    const pageNumber = Number(page);
-    const limitNumber = Number(limit);
+    const query = { isDeleted: showDeleted === "true" ? true : false };
 
-    const filter = {};
-
-    // 🔹 Soft delete filter
-    if (showDeleted !== "true") {
-      filter.isDeleted = false;
-    }
-
-    // 🔹 Status filter
+    // 1️⃣ Status filter (CREATED, PENDING, DELIVERED)
     if (status) {
-      filter.status = status;
+      query.status = status;
     }
 
-    // 🔹 Search (customer name or phone)
+    // 2️⃣ Search by customer name
     if (search) {
-      filter.$or = [
-        { "customer.name": { $regex: search, $options: "i" } },
-        { "customer.phone": { $regex: search, $options: "i" } }
-      ];
+      query["customer.name"] = { $regex: search, $options: "i" };
     }
 
-    const total = await Order.countDocuments(filter);
+    // 3️⃣ Time-based filters for dashboard cards
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // start of today
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999); // end of today
 
-    const orders = await Order.find(filter)
+    if (filter === "due-today") {
+      query.deliveryDate = { $gte: today, $lte: endOfToday };
+    } else if (filter === "upcoming") {
+      query.deliveryDate = { $gt: endOfToday };
+    } else if (filter === "overdue") {
+      query.deliveryDate = { $lt: today };
+    }
+
+    // Pagination
+    const totalOrders = await Order.countDocuments(query);
+    const orders = await Order.find(query)
       .sort({ deliveryDate: 1 })
-      .skip((pageNumber - 1) * limitNumber)
-      .limit(limitNumber);
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
 
-    res.status(200).json({
+    res.json({
       data: orders,
-      total,
-      page: pageNumber,
-      limit: limitNumber,
-      totalPages: Math.ceil(total / limitNumber)
+      page: Number(page),
+      totalPages: Math.ceil(totalOrders / limit),
+      total: totalOrders,
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch orders" });
   }
 };
+
 
 
 export const getOrderById = async (req, res) => {
