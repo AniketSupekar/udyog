@@ -17,7 +17,7 @@ const Dashboard = () => {
 
       <OverdueOrders />
       <DueTodayOrders />
-      {/* <UpcomingOrders /> */}
+      <UpcomingOrders />
     </div>
   );
 };
