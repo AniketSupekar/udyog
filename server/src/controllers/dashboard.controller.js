@@ -110,3 +110,45 @@ export const getUpcomingOrders = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const getBusinessSnapshot = async (req, res) => {
+  try {
+    let { startDate, endDate } = req.query;
+
+    let start, end;
+
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    }
+
+    const result = await Order.aggregate([
+      {
+        $match: {
+          status: "DELIVERED",
+          deliveryDate: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          deliveredOrders: { $sum: 1 },
+          totalQuantity: { $sum: "$quantity" }
+        }
+      }
+    ]);
+
+    res.json(result[0] || { deliveredOrders: 0, totalQuantity: 0 });
+  } catch (error) {
+    console.error("Business Snapshot Error:", error);
+    res.status(500).json({ message: "Failed to fetch business snapshot" });
+  }
+};
+
+
