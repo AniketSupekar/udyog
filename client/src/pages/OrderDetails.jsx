@@ -155,12 +155,12 @@ export default function OrderDetails() {
           <div className="flex gap-3">
 
 
-                <button
+            {/* <button
                   onClick={() => setShowBill(true)}
                   className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
                 >
                   Generate Bill
-                </button>
+                </button> */}
 
             {order.status !== "DELIVERED" && (
               <>
@@ -357,12 +357,23 @@ export default function OrderDetails() {
               )}
             </div>
 
-            <div className="col-span-2 pt-2 border-t">
-              <p className="text-gray-500">Remaining Amount</p>
-              <p className="text-lg font-semibold text-red-600">
-                ₹ {order.remainingAmount}
-              </p>
+            <div className="col-span-2 pt-2 border-t flex items-center justify-between">
+              <div>
+                <p className="text-gray-500">Remaining Amount</p>
+                <p className="text-lg font-semibold text-red-600">
+                  ₹ {order.remainingAmount}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowBill(true)}
+                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition whitespace-nowrap"
+              >
+                Generate Bill
+              </button>
             </div>
+
+
           </div>
         </div>
       </div>

@@ -1,12 +1,11 @@
-
 const BillPreview = ({ order }) => {
   if (!order) return null;
 
   return (
-    <div className="bg-white text-gray-800 max-w-[800px] mx-auto p-8 rounded-md">
+    <div className="bg-white text-gray-800 max-w-[800px] mx-auto p-5 sm:p-8 rounded-md">
 
       {/* ================= HEADER ================= */}
-      <div className="flex justify-between items-start mb-10">
+      <div className="flex justify-between items-start mb-8 sm:mb-10">
         <div>
           <h1 className="text-xl font-semibold tracking-wide">
             Balaji Hightech Nursery
@@ -28,35 +27,37 @@ const BillPreview = ({ order }) => {
         </div>
       </div>
 
-      {/* ================= FROM / TO ================= */}
-      <div className="grid grid-cols-2 gap-6 mb-10 text-sm">
-        <div className="border border-gray-200 rounded-md p-4">
+      {/* ================= FROM / TO (UPDATED ONLY) ================= */}
+      <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-6 mb-10 text-sm">
+        <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs uppercase text-gray-500 mb-2">
             From
           </p>
           <p className="font-semibold">
             Balaji Hightech Nursery
           </p>
-          <p className="text-gray-600">📞 9876543210</p>
+          <p className="text-gray-600 mt-1">
+            📞 9876543210
+          </p>
         </div>
 
-        <div className="border border-gray-200 rounded-md p-4">
+        <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-xs uppercase text-gray-500 mb-2">
             Bill To
           </p>
           <p className="font-semibold">
             {order.customer.name}
           </p>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mt-1">
             📞 {order.customer.phone}
           </p>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mt-1">
             📍 {order.customer.address}
           </p>
         </div>
       </div>
 
-      {/* ================= ITEMS TABLE ================= */}
+      {/* ================= ITEMS TABLE (UNCHANGED) ================= */}
       <table className="w-full text-sm mb-8 border-collapse">
         <thead>
           <tr className="bg-gray-100 text-gray-600">
@@ -93,9 +94,9 @@ const BillPreview = ({ order }) => {
         </tbody>
       </table>
 
-      {/* ================= TOTALS ================= */}
+      {/* ================= TOTALS (UNCHANGED) ================= */}
       <div className="flex justify-end mb-10">
-        <div className="w-72 text-sm space-y-2">
+        <div className="w-full sm:w-72 text-sm space-y-2">
           <div className="flex justify-between">
             <span className="text-gray-600">
               Subtotal
