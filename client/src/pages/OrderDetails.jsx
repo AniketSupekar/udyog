@@ -9,6 +9,7 @@ import {
 import Layout from "../components/Layout";
 import Header from "../components/Header";
 import StatusBadge from "../components/StatusBadge";
+import BillModal from "../components/bill/BillModal";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -18,6 +19,8 @@ export default function OrderDetails() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
+
+  const [showBill, setShowBill] = useState(false);
 
   const handleStatusChange = async (nextStatus) => {
     const confirmed = window.confirm(
@@ -150,6 +153,15 @@ export default function OrderDetails() {
           )}
 
           <div className="flex gap-3">
+
+
+                <button
+                  onClick={() => setShowBill(true)}
+                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+                >
+                  Generate Bill
+                </button>
+
             {order.status !== "DELIVERED" && (
               <>
                 {order.status === "CREATED" && (
@@ -354,6 +366,14 @@ export default function OrderDetails() {
           </div>
         </div>
       </div>
-      </>
+
+      {showBill && (
+        <BillModal
+          order={order}
+          onClose={() => setShowBill(false)}
+        />
+      )}
+
+    </>
   );
 }
