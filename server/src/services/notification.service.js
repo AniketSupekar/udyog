@@ -2,7 +2,6 @@ import Order from "../models/Order.js";
 import Notification from "../models/Notification.js";
 
 export const createTomorrowDeliveryNotifications = async () => {
-  console.log("🔔 Notification job started");
 
   // 1️⃣ Calculate tomorrow date range
   const start = new Date();
@@ -12,7 +11,6 @@ export const createTomorrowDeliveryNotifications = async () => {
   const end = new Date(start);
   end.setHours(23, 59, 59, 999);
 
-  console.log("Date range:", start, end);
 
   // 2️⃣ Find eligible orders
   const orders = await Order.find({
@@ -22,7 +20,6 @@ export const createTomorrowDeliveryNotifications = async () => {
     notificationSent: { $ne: true }
   });
 
-  console.log("Orders found:", orders.length);
 
   if (!orders.length) {
     return { created: 0 };

@@ -113,18 +113,35 @@ export const getUpcomingOrders = async (req, res) => {
 
 export const getBusinessSnapshot = async (req, res) => {
   try {
-    let { startDate, endDate } = req.query;
+    const { startDate, endDate, month } = req.query;
 
     let start, end;
 
+    // 1️⃣ Explicit date range (highest priority)
     if (startDate && endDate) {
       start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
+
       end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-    } else {
+    }
+
+    // 2️⃣ Month-based query (YYYY-MM)
+    else if (month) {
+      const [year, monthIndex] = month.split("-").map(Number);
+
+      if (!year || !monthIndex) {
+        return res.status(400).json({ message: "Invalid month format. Use YYYY-MM" });
+      }
+
+      start = new Date(year, monthIndex - 1, 1, 0, 0, 0, 0);
+      end = new Date(year, monthIndex, 0, 23, 59, 59, 999);
+    }
+
+    // 3️⃣ Default → current month
+    else {
       const now = new Date();
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     }
 
@@ -150,5 +167,6 @@ export const getBusinessSnapshot = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch business snapshot" });
   }
 };
+
 
 
