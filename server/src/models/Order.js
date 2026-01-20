@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema(
   {
+    nurseryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Nursery",
+    required: true,
+    index: true,
+  },
     customer: {
       name: { type: String, required: true },
       phone: { type: String, required: true },
@@ -62,5 +68,7 @@ const orderSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+orderSchema.index({ nurseryId: 1, deliveryDate: 1, notificationSent: 1 });
 
 export default mongoose.model("Order", orderSchema);

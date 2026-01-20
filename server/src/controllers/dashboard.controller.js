@@ -1,8 +1,11 @@
 // server/src/controllers/dashboard.controller.js
+import mongoose from "mongoose";
 import Order from "../models/Order.js";
 
 export const getDashboardSummary = async (req, res) => {
   try {
+    const nurseryId = req.user.nurseryId;
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -15,23 +18,27 @@ export const getDashboardSummary = async (req, res) => {
 
     const [dueToday, overdue, upcoming, pending] = await Promise.all([
       Order.countDocuments({
+        nurseryId,
         deliveryDate: { $gte: todayStart, $lte: todayEnd },
         status: { $ne: "DELIVERED" },
         isDeleted: false
       }),
 
       Order.countDocuments({
+        nurseryId,
         deliveryDate: { $lt: todayStart },
         status: { $ne: "DELIVERED" },
         isDeleted: false
       }),
 
       Order.countDocuments({
+        nurseryId,
         deliveryDate: { $gt: todayEnd, $lte: upcomingEnd },
         isDeleted: false
       }),
 
       Order.countDocuments({
+        nurseryId,
         status: "PENDING",
         isDeleted: false
       })
@@ -54,6 +61,7 @@ export const getOverdueOrders = async (req, res) => {
     todayStart.setHours(0, 0, 0, 0);
 
     const orders = await Order.find({
+      nurseryId: req.user.nurseryId,
       deliveryDate: { $lt: todayStart },
       status: { $ne: "DELIVERED" },
       isDeleted: false
@@ -76,6 +84,7 @@ export const getDueTodayOrders = async (req, res) => {
     todayEnd.setHours(23, 59, 59, 999);
 
     const orders = await Order.find({
+      nurseryId: req.user.nurseryId,
       deliveryDate: { $gte: todayStart, $lte: todayEnd },
       status: { $ne: "DELIVERED" },
       isDeleted: false
@@ -99,6 +108,7 @@ export const getUpcomingOrders = async (req, res) => {
     upcomingEnd.setHours(23, 59, 59, 999);
 
     const orders = await Order.find({
+      nurseryId: req.user.nurseryId,
       deliveryDate: { $gt: todayEnd, $lte: upcomingEnd },
       isDeleted: false
     })
@@ -148,6 +158,7 @@ export const getBusinessSnapshot = async (req, res) => {
     const result = await Order.aggregate([
       {
         $match: {
+          nurseryId: new mongoose.Types.ObjectId(req.user.nurseryId),
           status: "DELIVERED",
           deliveryDate: { $gte: start, $lte: end }
         }
