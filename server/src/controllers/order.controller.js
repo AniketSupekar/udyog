@@ -1,8 +1,10 @@
 import Order from "../models/Order.js";
 
-
 export const createOrder = async (req, res) => {
+
   try {
+    const nurseryId = req.user.nurseryId;
+
     const {
       customer,
       orderDate,
@@ -39,6 +41,7 @@ export const createOrder = async (req, res) => {
     }
 
     const order = await Order.create({
+      nurseryId,
       customer,
       orderDate,
       deliveryDate,
@@ -59,9 +62,22 @@ export const createOrder = async (req, res) => {
 
 export const getAllOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", status, filter, showDeleted = false } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      status,
+      filter,
+      showDeleted = false
+    } = req.query;
 
-    const query = { isDeleted: showDeleted === "true" ? true : false };
+    const nurseryId = req.user.nurseryId;
+
+    const query = { nurseryId };
+
+    if (showDeleted !== "true") {
+      query.isDeleted = false;
+    }
 
     // 1️⃣ Status filter (CREATED, PENDING, DELIVERED)
     if (status) {
@@ -106,11 +122,12 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
-
-
 export const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findOne({
+      _id: req.params.id,
+      nurseryId: req.user.nurseryId
+    });
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -127,7 +144,11 @@ export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const order = await Order.findById(id);
+    const order = await Order.findOne({
+      _id: id,
+      nurseryId: req.user.nurseryId
+    });
+
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
@@ -162,13 +183,15 @@ export const updateOrderStatus = async (req, res) => {
 
 export const softDeleteOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
+    const order = await Order.findOneAndUpdate(
+      { _id: req.params.id, nurseryId: req.user.nurseryId },
       { isDeleted: true },
       { new: true }
     );
 
-    if (!order) return res.status(404).json({ message: "Order not found" });
+     if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
 
     res.status(200).json({ message: "Order deleted", order });
   } catch (error) {
@@ -180,7 +203,11 @@ export const updateOrderDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findById(id);
+    const order = await Order.findOne({
+      _id: id,
+      nurseryId: req.user.nurseryId
+    });
+
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }

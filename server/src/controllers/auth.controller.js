@@ -2,13 +2,17 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 
-const generateToken = (userId) => {
+const generateToken = (user) => {
   return jwt.sign(
-    { userId },
+    {
+      userId: user._id,
+      nurseryId: user.nurseryId
+    },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN }
   );
 };
+
 
 export const login = async (req, res) => {
   const { email, password } = req.body;
@@ -27,7 +31,7 @@ export const login = async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  const token = generateToken(user._id);
+  const token = generateToken(user);
 
   res.cookie("token", token, {
     httpOnly: true,
@@ -41,7 +45,8 @@ export const login = async (req, res) => {
     user: {
       id: user._id,
       name: user.name,
-      email: user.email
+      email: user.email,
+      nurseryId: user.nurseryId
     }
   });
 };

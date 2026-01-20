@@ -3,7 +3,8 @@ import Notification from "../models/Notification.js";
 
 export const triggerNotifications = async (req, res) => {
   try {
-    const result = await createTomorrowDeliveryNotifications();
+    const nurseryId = req.user.nurseryId;   
+    const result = await createTomorrowDeliveryNotifications(nurseryId);
     res.json({
       success: true,
       message: "Notifications processed",
@@ -17,28 +18,30 @@ export const triggerNotifications = async (req, res) => {
 
 export const getAllNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find()
-      .sort({ createdAt: -1 });
+    const notifications = await Notification.find({
+      nurseryId: req.user.nurseryId
+    }).sort({ createdAt: -1 });
 
     res.json(notifications);
   } catch (error) {
-  console.error("❌ Notification fetch error:", error);
-  res.status(500).json({
-    message: "Failed to fetch notifications",
-    error: error.message
-  });
-}
+    console.error("❌ Notification fetch error:", error);
+    res.status(500).json({
+      message: "Failed to fetch notifications",
+      error: error.message
+    });
+  }
 };
 
 export const markNotificationAsRead = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const notification = await Notification.findByIdAndUpdate(
-      id,
+    const notification = await Notification.findOneAndUpdate(
+      { _id: id, nurseryId: req.user.nurseryId },
       { isRead: true },
       { new: true }
     );
+
 
     if (!notification) {
       return res.status(404).json({ message: "Notification not found" });
@@ -53,7 +56,7 @@ export const markNotificationAsRead = async (req, res) => {
 export const markAllNotificationsAsRead = async (req, res) => {
   try {
     await Notification.updateMany(
-      { isRead: false },
+      { nurseryId: req.user.nurseryId, isRead: false },
       { isRead: true }
     );
 
