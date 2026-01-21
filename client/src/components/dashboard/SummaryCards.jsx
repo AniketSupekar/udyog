@@ -1,27 +1,10 @@
 // src/components/dashboard/SummaryCards.jsx
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDashboardSummary } from "../../services/dashboard.api";
 
-const SummaryCards = () => {
-  const [summary, setSummary] = useState(null);
+const SummaryCards = ({ summary }) => {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    getDashboardSummary()
-      .then(res => setSummary(res.data))
-      .catch(err => console.error(err));
-  }, []);
-
-  if (!summary) {
-    return (
-      <div className="grid grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
-        ))}
-      </div>
-    );
-  }
+  if (!summary) return null;
 
   const cards = [
     { label: "Due Today", value: summary.dueToday, route: "/order?filter=due-today" },

@@ -1,18 +1,9 @@
 // src/components/dashboard/OverdueOrders.jsx
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getOverdueOrders } from "../../services/dashboard.api";
 import StatusBadge from "../StatusBadge";
 
-const OverdueOrders = () => {
-  const [orders, setOrders] = useState([]);
+const OverdueOrders = ({ orders = [] }) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    getOverdueOrders()
-      .then(res => setOrders(res.data.slice(0, 7)))
-      .catch(err => console.error(err));
-  }, []);
 
   if (!orders.length) return null;
 
@@ -29,7 +20,7 @@ const OverdueOrders = () => {
       </div>
 
       <div className="space-y-3">
-        {orders.map(order => (
+        {orders.slice(0, 7).map(order => (
           <button
             key={order._id}
             onClick={() => navigate(`/order/${order._id}`)}
