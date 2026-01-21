@@ -3,14 +3,20 @@ const BASE_URL =
     ? "/api/notifications" 
     : "https://nursery-app-iin1.onrender.com/api/notifications";
 
+const fetchWithAuth = (url, options = {}) =>
+  fetch(url, {
+    credentials: "include",
+    ...options
+  });
+
 export async function getNotifications() {
-  const res = await fetch(BASE_URL);
+  const res = await fetchWithAuth(BASE_URL);
   if (!res.ok) throw new Error("Failed to fetch notifications");
   return res.json();
 }
 
 export async function markNotificationRead(id) {
-  const res = await fetch(`${BASE_URL}/${id}/read`, {
+  const res = await fetchWithAuth(`${BASE_URL}/${id}/read`, {
     method: "PATCH",
   });
   if (!res.ok) throw new Error("Failed to mark notification read");
@@ -18,7 +24,7 @@ export async function markNotificationRead(id) {
 }
 
 export async function markAllNotificationsRead() {
-  const res = await fetch(`${BASE_URL}/read-all`, {
+  const res = await fetchWithAuth(`${BASE_URL}/read-all`, {
     method: "PATCH",
   });
   if (!res.ok) throw new Error("Failed to mark all notifications read");
