@@ -59,7 +59,7 @@ export const getOverdueOrders = async (req, res) => {
   try {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-
+    
     const orders = await Order.find({
       nurseryId: req.user.nurseryId,
       deliveryDate: { $lt: todayStart },
@@ -92,7 +92,7 @@ export const getDueTodayOrders = async (req, res) => {
       .sort({ deliveryDate: 1, createdAt: -1 })
       .limit(15);
 
-    res.status(200).json(orders);
+      res.status(200).json(orders);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -179,5 +179,83 @@ export const getBusinessSnapshot = async (req, res) => {
   }
 };
 
+export const getDashboardSummaryForTenant = async (nurseryId) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const upcomingEnd = new Date();
+  upcomingEnd.setDate(upcomingEnd.getDate() + 7);
+  upcomingEnd.setHours(23, 59, 59, 999);
 
+  const [dueToday, overdue, upcoming, pending] = await Promise.all([
+    Order.countDocuments({ nurseryId, deliveryDate: { $gte: todayStart, $lte: todayEnd }, status: { $ne: "DELIVERED" }, isDeleted: false }),
+    Order.countDocuments({ nurseryId, deliveryDate: { $lt: todayStart }, status: { $ne: "DELIVERED" }, isDeleted: false }),
+    Order.countDocuments({ nurseryId, deliveryDate: { $gt: todayEnd, $lte: upcomingEnd }, isDeleted: false }),
+    Order.countDocuments({ nurseryId, status: "PENDING", isDeleted: false })
+  ]);
 
+  return { dueToday, overdue, upcoming, pending };
+};
+
+export const getOverdueOrdersForTenant = async (nurseryId) => {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  return Order.find({ nurseryId, deliveryDate: { $lt: todayStart }, status: { $ne: "DELIVERED" }, isDeleted: false })
+    .sort({ deliveryDate: 1, createdAt: -1 }).limit(15);
+};
+
+export const getDueTodayOrdersForTenant = async (nurseryId) => {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  return Order.find({ nurseryId, deliveryDate: { $gte: todayStart, $lte: todayEnd }, status: { $ne: "DELIVERED" }, isDeleted: false })
+    .sort({ deliveryDate: 1, createdAt: -1 }).limit(15);
+};
+
+export const getUpcomingOrdersForTenant = async (nurseryId) => {
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const upcomingEnd = new Date(); upcomingEnd.setDate(upcomingEnd.getDate() + 7);
+  upcomingEnd.setHours(23, 59, 59, 999);
+  return Order.find({ nurseryId, deliveryDate: { $gt: todayEnd, $lte: upcomingEnd }, isDeleted: false })
+    .sort({ deliveryDate: 1, createdAt: -1 }).limit(15);
+};
+
+export const getBusinessSnapshotForTenant = async (nurseryId) => {
+  const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const end = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59, 999);
+  const result = await Order.aggregate([
+    { $match: { nurseryId: new mongoose.Types.ObjectId(nurseryId), status: "DELIVERED", deliveryDate: { $gte: start, $lte: end } } },
+    { $group: { _id: null, deliveredOrders: { $sum: 1 }, totalQuantity: { $sum: "$quantity" } } }
+  ]);
+  return result[0] || { deliveredOrders: 0, totalQuantity: 0 };
+};
+
+export const getFullDashboard = async (req, res) => {
+  try {
+    const nurseryId = req.user.nurseryId;
+
+    const [
+      summary,
+      overdue,
+      dueToday,
+      upcoming,
+      snapshot
+    ] = await Promise.all([
+      getDashboardSummaryForTenant(nurseryId),
+      getOverdueOrdersForTenant(nurseryId),
+      getDueTodayOrdersForTenant(nurseryId),
+      getUpcomingOrdersForTenant(nurseryId),
+      getBusinessSnapshotForTenant(nurseryId)
+    ]);
+
+    res.json({
+      summary,
+      overdue,
+      dueToday,
+      upcoming,
+      snapshot
+    });
+  } catch (err) {
+    console.error("Full dashboard error:", err);
+    res.status(500).json({ message: "Failed to load dashboard" });
+  }
+};

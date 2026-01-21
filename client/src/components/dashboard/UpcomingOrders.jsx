@@ -1,18 +1,9 @@
 // src/components/dashboard/UpcomingOrders.jsx
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUpcomingOrders } from "../../services/dashboard.api";
 import StatusBadge from "../StatusBadge";
 
-const UpcomingOrders = () => {
-  const [orders, setOrders] = useState([]);
+const UpcomingOrders = ({ orders = [] }) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    getUpcomingOrders()
-      .then(res => setOrders(res.data.slice(0, 7)))
-      .catch(err => console.error(err));
-  }, []);
 
   if (!orders.length) return null;
 
@@ -29,7 +20,7 @@ const UpcomingOrders = () => {
       </div>
 
       <div className="space-y-3">
-        {orders.map(order => (
+        {orders.slice(0, 7).map(order => (
           <button
             key={order._id}
             onClick={() => navigate(`/order/${order._id}`)}

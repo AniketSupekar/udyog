@@ -7,7 +7,7 @@ const BASE_URL =
 
 const api = axios.create({
   baseURL: BASE_URL,
-  withCredentials: true, // important for cookie-based auth
+  withCredentials: true, 
 });
 
 // Dashboard APIs
@@ -19,3 +19,7 @@ export const getBusinessSnapshot = (params = {}) =>
   api.get("/dashboard/business-snapshot", {
     params,
   });
+
+// New API for single call
+export const getDashboardSummaryForTenant = () =>
+  api.get("/dashboard/full-dashboard"); 

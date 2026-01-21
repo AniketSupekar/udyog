@@ -1,18 +1,9 @@
 // src/components/dashboard/DueTodayOrders.jsx
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDueTodayOrders } from "../../services/dashboard.api";
 import StatusBadge from "../StatusBadge";
 
-const DueTodayOrders = () => {
-  const [orders, setOrders] = useState([]);
+const DueTodayOrders = ({ orders = [] }) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    getDueTodayOrders()
-      .then(res => setOrders(res.data.slice(0, 7)))
-      .catch(err => console.error(err));
-  }, []);
 
   if (!orders.length) return null;
 
@@ -29,7 +20,7 @@ const DueTodayOrders = () => {
       </div>
 
       <div className="space-y-3">
-        {orders.map(order => (
+        {orders.slice(0, 7).map(order => (
           <button
             key={order._id}
             onClick={() => navigate(`/order/${order._id}`)}
