@@ -17,26 +17,15 @@ connectDB();
 
 const app = express();
 
-const allowedOrigins = process.env.CLIENT_ORIGIN
-  ? process.env.CLIENT_ORIGIN.split(",")
-  : [];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow server-to-server / curl / cron
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
+    origin: [
+      "http://localhost:5173",
+      "nurseryapp-production-2598.up.railway.app"
+    ],
     credentials: true
   })
 );
-
 
 app.use(express.json());
 app.use(cookieParser());
