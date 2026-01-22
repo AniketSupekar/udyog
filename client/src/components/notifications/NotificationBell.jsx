@@ -12,16 +12,20 @@ export default function NotificationBell() {
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     const fetchNotifications = async () => {
-        setLoading(true);
-        try {
-            const data = await getNotifications();
-            setNotifications(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  setLoading(true);
+  try {
+    const data = await getNotifications();
+
+    // FIX: normalize response
+    setNotifications(Array.isArray(data) ? data : data.notifications || []);
+  } catch (err) {
+    console.error(err);
+    setNotifications([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
     useEffect(() => {
         fetchNotifications();
