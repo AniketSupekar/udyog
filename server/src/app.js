@@ -21,7 +21,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "nurseryapp-production-2598.up.railway.app"
+      "https://nurseryapp-production-2598.up.railway.app"
     ],
     credentials: true
   })
