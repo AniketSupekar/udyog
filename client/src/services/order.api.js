@@ -1,92 +1,38 @@
-const API_BASE_URL =
-  import.meta.env.MODE === "production"
-    ? "https://nursery-app-iin1.onrender.com/api/orders"
-    : "/api/orders";
+import api from "./api";
 
-const fetchWithAuth = (url, options = {}) =>
-  fetch(url, {
-    credentials: "include",
-    ...options
-  });
-    
 export const fetchOrders = async ({
   page = 1,
   limit = 10,
   search = "",
   status = "",
-  filter = "",      
+  filter = "",
   showDeleted = false
 } = {}) => {
-  const params = new URLSearchParams({
+  const params = {
     page,
     limit,
     search,
     status,
     showDeleted
-  });
+  };
 
-  if (filter) {
-    params.append("filter", filter);
-  }
+  if (filter) params.filter = filter;
 
-  const res = await fetchWithAuth(`${API_BASE_URL}?${params.toString()}`);
-  if (!res.ok) throw new Error("Failed to fetch orders");
-  return res.json();
+  const { data } = await api.get("/orders", { params });
+  return data;
 };
 
+export const fetchOrderById = (id) =>
+  api.get(`/orders/${id}`).then(res => res.data);
 
+export const createOrder = (data) =>
+  api.post("/orders", data).then(res => res.data);
 
-export const fetchOrderById = async (id) => {
-  const res = await fetchWithAuth(`${API_BASE_URL}/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch order");
-  return res.json();
-};
+export const updateOrderStatus = (id, status) =>
+  api.patch(`/orders/${id}/status`, { status }).then(res => res.data);
 
-export const createOrder = async (data) => {
- const res = await fetchWithAuth(`${API_BASE_URL}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
-  });
+export const softDeleteOrder = (id) =>
+  api.patch(`/orders/${id}/delete`).then(res => res.data);
 
-  if (!res.ok) throw new Error("Failed to create order");
-  return res.json();
-};
-
-export const updateOrderStatus = async (id, status) => {
-  const res = await fetchWithAuth(`${API_BASE_URL}/${id}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status })
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Request failed");
-  }
-
-  return res.json();
-};
-
-export const softDeleteOrder = async (id) => {
-  const res = await fetchWithAuth(`${API_BASE_URL}/${id}/delete`, {
-    method: "PATCH"
-  });
-  if (!res.ok) throw new Error("Failed to delete order");
-  return res.json();
-};
-
-export const updateOrderDetails = async (id, data) => {
-  const res = await fetchWithAuth(`${API_BASE_URL}/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message);
-  }
-
-  return res.json();
-};
+export const updateOrderDetails = (id, data) =>
+  api.patch(`/orders/${id}`, data).then(res => res.data);
