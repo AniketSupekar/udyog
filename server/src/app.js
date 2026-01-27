@@ -16,12 +16,13 @@ dotenv.config();
 connectDB();
 
 const app = express();
+app.set("trust proxy", 1);
 
 const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(",")
   : [];
 
-if (process.env.NODE_ENV === "development") {
+if (process.env.NODE_ENV === "production") {
   allowedOrigins.push("http://localhost:5173"); // add dev frontend
 }
 
