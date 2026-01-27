@@ -33,10 +33,12 @@ export const login = async (req, res) => {
 
   const token = generateToken(user);
 
+  const isProd = process.env.NODE_ENV === "production";
+
   res.cookie("token", token, {
     httpOnly: true,
-    secure: true,        // REQUIRED on HTTPS (Render)
-    sameSite: "none",    // REQUIRED for cross-origin
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
@@ -52,7 +54,12 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+  });
+
   res.json({ message: "Logged out successfully" });
 };
 
