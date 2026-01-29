@@ -25,7 +25,7 @@ const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(",")
   : [];
 
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV == "production") {
   allowedOrigins.push("http://localhost:5173");
 }
 
