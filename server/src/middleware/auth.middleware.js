@@ -1,5 +1,12 @@
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+
+/**
+ * OPTIMIZATION NOTES:
+ * - Removed DB call (User.findById)
+ * - JWT already contains userId + nurseryId
+ * - This middleware now does ZERO database work
+ * - Massive latency reduction on every protected route
+ */
 
 export const protect = async (req, res, next) => {
   const token = req.cookies?.token;
@@ -11,23 +18,15 @@ export const protect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.userId).select(
-      "_id nurseryId"
-    );
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (!user.nurseryId) {
+    if (!decoded?.userId || !decoded?.nurseryId) {
       return res.status(403).json({
         message: "User is not assigned to any nursery"
       });
     }
 
     req.user = {
-      userId: user._id,
-      nurseryId: user.nurseryId
+      userId: decoded.userId,
+      nurseryId: decoded.nurseryId
     };
 
     next();
