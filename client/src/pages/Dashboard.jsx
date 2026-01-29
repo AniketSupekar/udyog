@@ -28,9 +28,7 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
-        <span className="text-sm sm:text-base">
-          Loading dashboard…
-        </span>
+        Loading dashboard…
       </div>
     );
   }
