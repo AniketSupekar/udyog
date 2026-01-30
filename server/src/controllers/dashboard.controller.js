@@ -1,6 +1,7 @@
 // server/src/controllers/dashboard.controller.js
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
+import { getCache, setCache, delCache } from "../utils/redis.js";
 
 /* =======================
    SHARED DATE HELPERS
@@ -182,17 +183,11 @@ export const getFullDashboard = async (req, res) => {
     const nurseryId = req.user.nurseryId;
     const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
 
-    const [
-      summary,
-      overdue,
-      dueToday,
-      upcoming,
-      snapshot
-    ] = await Promise.all([
+    const [summary, overdue, dueToday, upcoming, snapshot] = await Promise.all([
       getDashboardSummaryForTenant(nurseryId),
-      baseFind({ nurseryId, deliveryDate: { $lt: todayStart }, status: { $ne: "DELIVERED" }, isDeleted: false }),
-      baseFind({ nurseryId, deliveryDate: { $gte: todayStart, $lte: todayEnd }, status: { $ne: "DELIVERED" }, isDeleted: false }),
-      baseFind({ nurseryId, deliveryDate: { $gt: todayEnd, $lte: upcomingEnd }, isDeleted: false }),
+      Order.find({ nurseryId, deliveryDate: { $lt: todayStart }, status: { $ne: "DELIVERED" }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean(),
+      Order.find({ nurseryId, deliveryDate: { $gte: todayStart, $lte: todayEnd }, status: { $ne: "DELIVERED" }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean(),
+      Order.find({ nurseryId, deliveryDate: { $gt: todayEnd, $lte: upcomingEnd }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean(),
       getBusinessSnapshotForTenant(nurseryId)
     ]);
 
@@ -206,6 +201,10 @@ export const getFullDashboard = async (req, res) => {
    TENANT HELPERS
 ======================= */
 export const getDashboardSummaryForTenant = async (nurseryId) => {
+  const cacheKey = `dashboard:summary:${nurseryId}`;
+  const cached = await getCache(cacheKey);
+  if (cached) return cached;
+
   const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
 
   const [dueToday, overdue, upcoming, pending] = await Promise.all([
@@ -215,10 +214,16 @@ export const getDashboardSummaryForTenant = async (nurseryId) => {
     Order.countDocuments({ nurseryId, status: "PENDING", isDeleted: false })
   ]);
 
-  return { dueToday, overdue, upcoming, pending };
+  const data = { dueToday, overdue, upcoming, pending };
+  await setCache(cacheKey, data, 30); // 30 seconds TTL
+  return data;
 };
 
 export const getBusinessSnapshotForTenant = async (nurseryId) => {
+  const cacheKey = `dashboard:snapshot:${nurseryId}`;
+  const cached = await getCache(cacheKey);
+  if (cached) return cached;
+
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -228,5 +233,7 @@ export const getBusinessSnapshotForTenant = async (nurseryId) => {
     { $group: { _id: null, deliveredOrders: { $sum: 1 }, totalQuantity: { $sum: "$quantity" } } }
   ]);
 
-  return result[0] || { deliveredOrders: 0, totalQuantity: 0 };
+  const snapshot = result[0] || { deliveredOrders: 0, totalQuantity: 0 };
+  await setCache(cacheKey, snapshot, 60); // 60 seconds TTL
+  return snapshot;
 };
