@@ -1,5 +1,6 @@
 // src/controllers/order.controller.js
 import Order from "../models/Order.js";
+import { delCache } from "../utils/redis.js";
 
 /* ======================
    CREATE ORDER
@@ -7,42 +8,21 @@ import Order from "../models/Order.js";
 export const createOrder = async (req, res) => {
   try {
     const nurseryId = req.user.nurseryId;
-    const {
-      customer,
-      orderDate,
-      deliveryDate,
-      quantity,
-      rate,
-      advancePaid = 0
-    } = req.body;
+    const { customer, orderDate, deliveryDate, quantity, rate, advancePaid = 0 } = req.body;
 
-    if (!customer || !orderDate || !deliveryDate || quantity == null || rate == null) {
+    if (!customer || !orderDate || !deliveryDate || quantity == null || rate == null)
       return res.status(400).json({ message: "Missing required fields" });
-    }
-
-    if (quantity <= 0 || rate <= 0) {
-      return res.status(400).json({ message: "Quantity and rate must be greater than zero" });
-    }
+    if (quantity <= 0 || rate <= 0) return res.status(400).json({ message: "Quantity and rate must be greater than zero" });
 
     const totalAmount = quantity * rate;
     const remainingAmount = totalAmount - advancePaid;
+    if (remainingAmount < 0) return res.status(400).json({ message: "Advance cannot exceed total amount" });
 
-    if (remainingAmount < 0) {
-      return res.status(400).json({ message: "Advance cannot exceed total amount" });
-    }
+    const order = await Order.create({ nurseryId, customer, orderDate, deliveryDate, quantity, rate, totalAmount, advancePaid, remainingAmount, status: "CREATED" });
 
-    const order = await Order.create({
-      nurseryId,
-      customer,
-      orderDate,
-      deliveryDate,
-      quantity,
-      rate,
-      totalAmount,
-      advancePaid,
-      remainingAmount,
-      status: "CREATED"
-    });
+    // Invalidate dashboard & orders cache
+    await delCache(`dashboard:*:${nurseryId}`);
+    await delCache(`orders:*:${nurseryId}*`);
 
     res.status(201).json(order);
   } catch (err) {
@@ -135,53 +115,36 @@ export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const order = await Order.findOne({
-      _id: id,
-      nurseryId: req.user.nurseryId
-    });
+    const order = await Order.findOne({ _id: id, nurseryId: req.user.nurseryId });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.status === "DELIVERED") return res.status(400).json({ message: "Delivered orders cannot be modified" });
 
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    if (order.status === "DELIVERED") {
-      return res.status(400).json({ message: "Delivered orders cannot be modified" });
-    }
-
-    const allowedTransitions = {
-      CREATED: ["PENDING"],
-      PENDING: ["DELIVERED"]
-    };
-
-    if (!allowedTransitions[order.status]?.includes(status)) {
-      return res.status(400).json({
-        message: `Invalid status transition from ${order.status} to ${status}`
-      });
-    }
+    const allowedTransitions = { CREATED: ["PENDING"], PENDING: ["DELIVERED"] };
+    if (!allowedTransitions[order.status]?.includes(status))
+      return res.status(400).json({ message: `Invalid status transition from ${order.status} to ${status}` });
 
     order.status = status;
     await order.save();
+
+    // Invalidate dashboard & orders cache
+    await delCache(`dashboard:*:${req.user.nurseryId}`);
+    await delCache(`orders:*:${req.user.nurseryId}*`);
 
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-
 /* ======================
    SOFT DELETE ORDER
 ====================== */
 export const softDeleteOrder = async (req, res) => {
   try {
-    const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, nurseryId: req.user.nurseryId },
-      { isDeleted: true },
-      { new: true }
-    ).lean();
+    const order = await Order.findOneAndUpdate({ _id: req.params.id, nurseryId: req.user.nurseryId }, { isDeleted: true }, { new: true }).lean();
+    if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
+    await delCache(`dashboard:*:${req.user.nurseryId}`);
+    await delCache(`orders:*:${req.user.nurseryId}*`);
 
     res.json({ message: "Order deleted", order });
   } catch (err) {
@@ -189,33 +152,13 @@ export const softDeleteOrder = async (req, res) => {
   }
 };
 
-/* ======================
-   UPDATE ORDER DETAILS
-====================== */
 export const updateOrderDetails = async (req, res) => {
   try {
     const { id } = req.params;
+    const order = await Order.findOne({ _id: id, nurseryId: req.user.nurseryId, status: { $ne: "DELIVERED" }, isDeleted: false });
+    if (!order) return res.status(404).json({ message: "Order not found or locked" });
 
-    const order = await Order.findOne({
-      _id: id,
-      nurseryId: req.user.nurseryId,
-      status: { $ne: "DELIVERED" },
-      isDeleted: false
-    });
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found or locked" });
-    }
-
-    const {
-      customer,
-      orderDate,
-      deliveryDate,
-      quantity,
-      rate,
-      advancePaid
-    } = req.body;
-
+    const { customer, orderDate, deliveryDate, quantity, rate, advancePaid } = req.body;
     if (customer) order.customer = customer;
     if (orderDate) order.orderDate = orderDate;
     if (deliveryDate) order.deliveryDate = deliveryDate;
@@ -225,12 +168,13 @@ export const updateOrderDetails = async (req, res) => {
 
     order.totalAmount = order.quantity * order.rate;
     order.remainingAmount = order.totalAmount - order.advancePaid;
-
-    if (order.remainingAmount < 0) {
-      return res.status(400).json({ message: "Advance cannot exceed total amount" });
-    }
+    if (order.remainingAmount < 0) return res.status(400).json({ message: "Advance cannot exceed total amount" });
 
     await order.save();
+
+    await delCache(`dashboard:*:${req.user.nurseryId}`);
+    await delCache(`orders:*:${req.user.nurseryId}*`);
+
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: err.message });
