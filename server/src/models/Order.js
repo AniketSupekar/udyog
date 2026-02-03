@@ -83,10 +83,6 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-/**
- * 🔥 Compound indexes aligned with real queries
- */
-
 // Main order listing (dashboard / orders page)
 orderSchema.index({
   nurseryId: 1,
@@ -106,6 +102,14 @@ orderSchema.index({
   nurseryId: 1,
   deliveryDate: 1,
   notificationSent: 1,
+});
+
+// Optimized for dashboard order lists (filter + sort)
+orderSchema.index({
+  nurseryId: 1,
+  isDeleted: 1,
+  deliveryDate: 1,
+  createdAt: -1,
 });
 
 export default mongoose.model("Order", orderSchema);

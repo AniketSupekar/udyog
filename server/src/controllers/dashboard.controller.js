@@ -1,7 +1,7 @@
 // server/src/controllers/dashboard.controller.js
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
-import { getCache, setCache, delCache } from "../utils/redis.js";
+import { getCache, setCache } from "../utils/redis.js";
 
 /* =======================
    SHARED DATE HELPERS
@@ -25,46 +25,8 @@ const getDateRanges = () => {
 ======================= */
 export const getDashboardSummary = async (req, res) => {
   try {
-    const nurseryId = new mongoose.Types.ObjectId(req.user.nurseryId);
-    const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
-
-    const result = await Order.aggregate([
-      {
-        $match: {
-          nurseryId,
-          isDeleted: false
-        }
-      },
-      {
-        $facet: {
-          dueToday: [
-            { $match: { deliveryDate: { $gte: todayStart, $lte: todayEnd }, status: { $ne: "DELIVERED" } } },
-            { $count: "count" }
-          ],
-          overdue: [
-            { $match: { deliveryDate: { $lt: todayStart }, status: { $ne: "DELIVERED" } } },
-            { $count: "count" }
-          ],
-          upcoming: [
-            { $match: { deliveryDate: { $gt: todayEnd, $lte: upcomingEnd } } },
-            { $count: "count" }
-          ],
-          pending: [
-            { $match: { status: "PENDING" } },
-            { $count: "count" }
-          ]
-        }
-      }
-    ]);
-
-    const data = result[0];
-
-    res.json({
-      dueToday: data.dueToday[0]?.count || 0,
-      overdue: data.overdue[0]?.count || 0,
-      upcoming: data.upcoming[0]?.count || 0,
-      pending: data.pending[0]?.count || 0
-    });
+    const summary = await getDashboardSummaryForTenant(req.user.nurseryId);
+    res.json(summary);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -82,55 +44,49 @@ const baseFind = (query) =>
 export const getOverdueOrders = async (req, res) => {
   try {
     const { todayStart } = getDateRanges();
-
     const orders = await baseFind({
       nurseryId: req.user.nurseryId,
       deliveryDate: { $lt: todayStart },
       status: { $ne: "DELIVERED" },
       isDeleted: false
     });
-
     res.json(orders);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch {
+    res.status(500).json({ message: "Failed to fetch overdue orders" });
   }
 };
 
 export const getDueTodayOrders = async (req, res) => {
   try {
     const { todayStart, todayEnd } = getDateRanges();
-
     const orders = await baseFind({
       nurseryId: req.user.nurseryId,
       deliveryDate: { $gte: todayStart, $lte: todayEnd },
       status: { $ne: "DELIVERED" },
       isDeleted: false
     });
-
     res.json(orders);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch {
+    res.status(500).json({ message: "Failed to fetch due today orders" });
   }
 };
 
 export const getUpcomingOrders = async (req, res) => {
   try {
     const { todayEnd, upcomingEnd } = getDateRanges();
-
     const orders = await baseFind({
       nurseryId: req.user.nurseryId,
       deliveryDate: { $gt: todayEnd, $lte: upcomingEnd },
       isDeleted: false
     });
-
     res.json(orders);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch {
+    res.status(500).json({ message: "Failed to fetch upcoming orders" });
   }
 };
 
 /* =======================
-   BUSINESS SNAPSHOT
+   BUSINESS SNAPSHOT (DYNAMIC – NO CACHE)
 ======================= */
 export const getBusinessSnapshot = async (req, res) => {
   try {
@@ -170,35 +126,35 @@ export const getBusinessSnapshot = async (req, res) => {
     ]);
 
     res.json(result[0] || { deliveredOrders: 0, totalQuantity: 0 });
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Failed to fetch business snapshot" });
   }
 };
 
 /* =======================
-   FULL DASHBOARD (FAST)
+   FULL DASHBOARD (FAST + SAFE)
 ======================= */
 export const getFullDashboard = async (req, res) => {
   try {
     const nurseryId = req.user.nurseryId;
     const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
 
-    const [summary, overdue, dueToday, upcoming, snapshot] = await Promise.all([
-      getDashboardSummaryForTenant(nurseryId),
+    const [summary, snapshot, overdue, dueToday, upcoming] = await Promise.all([
+      getDashboardSummaryForTenant(nurseryId),   // cached
+      getBusinessSnapshotForTenant(nurseryId),   // cached (current month)
       Order.find({ nurseryId, deliveryDate: { $lt: todayStart }, status: { $ne: "DELIVERED" }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean(),
       Order.find({ nurseryId, deliveryDate: { $gte: todayStart, $lte: todayEnd }, status: { $ne: "DELIVERED" }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean(),
-      Order.find({ nurseryId, deliveryDate: { $gt: todayEnd, $lte: upcomingEnd }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean(),
-      getBusinessSnapshotForTenant(nurseryId)
+      Order.find({ nurseryId, deliveryDate: { $gt: todayEnd, $lte: upcomingEnd }, isDeleted: false }).sort({ deliveryDate: 1, createdAt: -1 }).limit(15).lean()
     ]);
 
     res.json({ summary, overdue, dueToday, upcoming, snapshot });
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Failed to load dashboard" });
   }
 };
 
 /* =======================
-   TENANT HELPERS
+   TENANT HELPERS (CACHE SAFE)
 ======================= */
 export const getDashboardSummaryForTenant = async (nurseryId) => {
   const cacheKey = `dashboard:summary:${nurseryId}`;
@@ -215,7 +171,7 @@ export const getDashboardSummaryForTenant = async (nurseryId) => {
   ]);
 
   const data = { dueToday, overdue, upcoming, pending };
-  await setCache(cacheKey, data, 30); // 30 seconds TTL
+  await setCache(cacheKey, data, 30);
   return data;
 };
 
@@ -229,11 +185,23 @@ export const getBusinessSnapshotForTenant = async (nurseryId) => {
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
   const result = await Order.aggregate([
-    { $match: { nurseryId: new mongoose.Types.ObjectId(nurseryId), status: "DELIVERED", deliveryDate: { $gte: start, $lte: end } } },
-    { $group: { _id: null, deliveredOrders: { $sum: 1 }, totalQuantity: { $sum: "$quantity" } } }
+    {
+      $match: {
+        nurseryId: new mongoose.Types.ObjectId(nurseryId),
+        status: "DELIVERED",
+        deliveryDate: { $gte: start, $lte: end }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        deliveredOrders: { $sum: 1 },
+        totalQuantity: { $sum: "$quantity" }
+      }
+    }
   ]);
 
   const snapshot = result[0] || { deliveredOrders: 0, totalQuantity: 0 };
-  await setCache(cacheKey, snapshot, 60); // 60 seconds TTL
+  await setCache(cacheKey, snapshot, 60);
   return snapshot;
 };
