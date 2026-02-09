@@ -26,7 +26,7 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-sm text-gray-500">
+      <div className="p-4 text-gray-500">
         Loading dashboard…
       </div>
     );
