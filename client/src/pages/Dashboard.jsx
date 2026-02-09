@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useEffect, useState } from "react";
 import Header from "../components/Header";
 import DashboardTopBar from "../components/dashboard/DashboardTopBar";
@@ -27,28 +26,32 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
+      <div className="flex items-center justify-center py-20 text-sm text-gray-500">
         Loading dashboard…
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="space-y-6">
+      {/* Identity / Navigation */}
       <Header />
 
+      {/* Context + actions */}
       <DashboardTopBar />
 
-      {/* Snapshot stays separate (by design) */}
-      <BusinessSnapshot />
+      {/* Business overview */}
+      <section className="space-y-4">
+        <SummaryCards summary={data.summary} />
+        <BusinessSnapshot />
+      </section>
 
-      {/* SUMMARY */}
-      <SummaryCards summary={data.summary} />
-
-      {/* LISTS */}
-      <OverdueOrders orders={data.overdue} />
-      <DueTodayOrders orders={data.dueToday} />
-      <UpcomingOrders orders={data.upcoming} />
+      {/* Operational lists */}
+      <section className="space-y-6">
+        <OverdueOrders orders={data.overdue} />
+        <DueTodayOrders orders={data.dueToday} />
+        <UpcomingOrders orders={data.upcoming} />
+      </section>
     </div>
   );
 };

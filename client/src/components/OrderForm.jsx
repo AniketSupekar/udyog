@@ -41,100 +41,106 @@ export default function OrderForm() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
+    <div className="max-w-3xl mx-auto px-4 py-6">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-sm p-6 space-y-6"
+        className="bg-white rounded-xl shadow-sm border border-gray-200"
       >
-        <h2 className="text-xl font-semibold text-gray-800">
-          Create Order
-        </h2>
-
-        {/* ================= CUSTOMER DETAILS ================= */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-gray-600">
-            Customer Details
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              name="name"
-              placeholder="Customer Name"
-              onChange={handleChange}
-              required
-              className="input"
-            />
-
-            <input
-              name="phone"
-              placeholder="Phone Number"
-              onChange={handleChange}
-              required
-              className="input"
-            />
-          </div>
-
-          <input
-            name="address"
-            placeholder="Address"
-            onChange={handleChange}
-            required
-            className="input"
-          />
+        {/* HEADER */}
+        <div className="px-6 pt-6 pb-4">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Create Order
+          </h2>
         </div>
 
-        {/* ================= ORDER DETAILS ================= */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-gray-600">
-            Order Details
-          </h3>
+        {/* BODY */}
+        <div className="px-6 space-y-8">
+          {/* CUSTOMER */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Customer Details
+            </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="date"
-              name="orderDate"
-              onChange={handleChange}
-              required
-              className="input"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                name="name"
+                placeholder="Customer Name"
+                onChange={handleChange}
+                required
+                className="input"
+              />
+
+              <input
+                name="phone"
+                placeholder="Phone Number"
+                onChange={handleChange}
+                required
+                className="input"
+              />
+            </div>
 
             <input
-              type="date"
-              name="deliveryDate"
+              name="address"
+              placeholder="Address"
               onChange={handleChange}
               required
               className="input"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              name="quantity"
-              placeholder="Quantity"
-              onChange={handleChange}
-              required
-              className="input"
-            />
+          {/* ORDER */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Order Details
+            </h3>
 
-            <input
-              name="rate"
-              placeholder="Rate"
-              onChange={handleChange}
-              required
-              className="input"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="date"
+                name="orderDate"
+                onChange={handleChange}
+                required
+                className="input"
+              />
 
-            <input
-              name="advancePaid"
-              placeholder="Advance Paid"
-              onChange={handleChange}
-              className="input"
-            />
+              <input
+                type="date"
+                name="deliveryDate"
+                onChange={handleChange}
+                required
+                className="input"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input
+                name="quantity"
+                placeholder="Quantity"
+                onChange={handleChange}
+                required
+                className="input"
+              />
+
+              <input
+                name="rate"
+                placeholder="Rate"
+                onChange={handleChange}
+                required
+                className="input"
+              />
+
+              <input
+                name="advancePaid"
+                placeholder="Advance Paid"
+                onChange={handleChange}
+                className="input"
+              />
+            </div>
           </div>
         </div>
 
-        {/* ================= ACTION BAR ================= */}
-        <div className="flex justify-end gap-3 pt-4 border-t">
+        {/* FOOTER */}
+        <div className="mt-8 px-6 py-4 border-t flex justify-end gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -145,7 +151,7 @@ export default function OrderForm() {
 
           <button
             type="submit"
-            className="px-5 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+            className="px-5 py-2 text-sm font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition"
           >
             Save Order
           </button>

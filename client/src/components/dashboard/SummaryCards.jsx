@@ -1,4 +1,3 @@
-// src/components/dashboard/SummaryCards.jsx
 import { useNavigate } from "react-router-dom";
 
 const SummaryCards = ({ summary }) => {
@@ -14,16 +13,23 @@ const SummaryCards = ({ summary }) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
       {cards.map(card => (
         <button
           key={card.label}
           onClick={() => navigate(card.route)}
-          className={`rounded-lg p-4 text-left shadow-sm border transition-transform hover:scale-[1.02]
-            ${card.highlight ? "border-red-300 bg-red-50" : "border-gray-200 bg-white"}`}
+          className={`
+            rounded-xl p-4 text-left border bg-white
+            transition active:scale-[0.98] md:hover:shadow-md
+            ${card.highlight ? "border-red-200 bg-red-50/60" : "border-gray-200"}
+          `}
         >
-          <div className="text-sm text-gray-500">{card.label}</div>
-          <div className="text-2xl font-semibold mt-1">{card.value}</div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            {card.label}
+          </div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900">
+            {card.value}
+          </div>
         </button>
       ))}
     </div>

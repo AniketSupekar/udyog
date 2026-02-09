@@ -1,4 +1,3 @@
-// src/components/dashboard/DueTodayOrders.jsx
 import { useNavigate } from "react-router-dom";
 import StatusBadge from "../StatusBadge";
 
@@ -8,37 +7,47 @@ const DueTodayOrders = ({ orders = [] }) => {
   if (!orders.length) return null;
 
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-sm font-semibold text-green-600">Orders Due Today</h2>
+    <section className="rounded-xl border bg-white shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/60">
+        <h2 className="text-sm font-semibold text-green-600">
+          Orders Due Today
+        </h2>
         <button
           onClick={() => navigate("/order?filter=due-today")}
-          className="text-xs text-blue-600"
+          className="text-xs font-medium text-blue-600 hover:underline"
         >
           View all
         </button>
       </div>
 
-      <div className="space-y-3">
+      {/* List */}
+      <div className="divide-y">
         {orders.slice(0, 7).map(order => (
           <button
             key={order._id}
             onClick={() => navigate(`/order/${order._id}`)}
-            className="w-full text-left p-3 rounded-md border hover:bg-gray-50 transition"
+            className="group w-full text-left px-4 py-3 transition hover:bg-gray-50"
           >
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="font-medium">{order.customer.name}</div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-gray-900 truncate">
+                  {order.customer.name}
+                </div>
                 <div className="text-xs text-gray-500">
-                  Delivery: {new Date(order.deliveryDate).toLocaleDateString()}
+                  Due today •{" "}
+                  {new Date(order.deliveryDate).toLocaleDateString()}
                 </div>
               </div>
-              <StatusBadge status={order.status} />
+
+              <div className="shrink-0">
+                <StatusBadge status={order.status} />
+              </div>
             </div>
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 
