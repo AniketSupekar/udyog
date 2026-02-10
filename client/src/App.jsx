@@ -6,6 +6,8 @@ import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import { useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
+import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
 
 function App() {
   const { user, loading } = useAuth();
@@ -38,6 +40,8 @@ function App() {
 
           <Route path="create" element={<CreateOrder />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
 
       </Routes>

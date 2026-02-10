@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from "react";
+import { Plus, ChevronDown, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import NotificationBell from "./notifications/NotificationBell";
 import { useAuth } from "../context/AuthContext";
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef();
+  const menuRef = useRef(null);
 
   // Close dropdown if clicked outside
   useEffect(() => {
@@ -32,47 +35,63 @@ export default function Header() {
   };
 
   return (
-    <header className="flex items-center justify-between bg-white shadow-md px-6 py-4 rounded-md mb-6">
-      {/* Left: Title */}
-      <h1 className="text-xl font-semibold text-gray-800">Nursery Orders</h1>
+    <header className="flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-sm">
+      {/* Left */}
+      <div>
+        <h1 className="text-lg font-semibold text-gray-900">
+          Nursery Orders
+        </h1>
+        <p className="text-xs text-gray-500">
+          Manage daily orders & deliveries
+        </p>
+      </div>
 
-      {/* Right: Actions */}
-      <div className="flex items-center gap-4 relative">
-        {/* Admin Name / Dropdown */}
+      {/* Right */}
+      <div className="flex items-center gap-3">
+        {/* Create Order */}
+        {/* <button
+          onClick={() => navigate("/create")}
+          className="flex items-center gap-1.5 rounded-full bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 transition"
+        >
+          <Plus size={16} />
+          Create
+        </button> */}
+
+        {/* Notifications */}
+        <NotificationBell />
+
+        {/* User Menu */}
         {user && (
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setShowMenu((prev) => !prev)}
-              className="flex items-center gap-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full shadow-sm transition duration-200 font-medium text-gray-700"
+              className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition"
             >
-              <span className="text-sm">{user.name}</span>
-              <svg
-                className={`w-3 h-3 text-gray-500 transition-transform duration-200 ${
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-xs font-semibold text-white">
+                {user.name?.[0]?.toUpperCase() || "A"}
+              </div>
+              <span className="hidden sm:block">{user.name}</span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${
                   showMenu ? "rotate-180" : ""
                 }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-md border border-gray-200 z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border bg-white shadow-lg z-50">
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                  className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition"
                 >
+                  <LogOut size={16} />
                   Logout
                 </button>
               </div>
             )}
           </div>
         )}
-
-        <NotificationBell />
       </div>
     </header>
   );

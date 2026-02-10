@@ -27,7 +27,7 @@ export default function BillModal({ order, onClose }) {
 
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-center overflow-auto p-4">
+    <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-center overflow-auto p-4 pb-24">
       <div className="bg-white w-full max-w-3xl rounded-xl overflow-hidden">
 
         <div className="flex justify-between items-center p-4 border-b">

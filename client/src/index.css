@@ -3,15 +3,68 @@
 @tailwind components;
 @tailwind utilities;
 
-.input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-md text-sm
-  focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500;
+/* ---------------------------
+   DESIGN TOKENS (DO NOT OVERTHINK)
+---------------------------- */
+:root {
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+
+  --text: #111827;
+  --text-muted: #6b7280;
+
+  --primary: #16a34a; /* green-600 */
+  --primary-soft: #dcfce7;
+
+  --danger: #dc2626;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
+/* ---------------------------
+   GLOBAL BASE
+---------------------------- */
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+/* ---------------------------
+   INPUTS (VERY IMPORTANT)
+---------------------------- */
+.input {
+  @apply w-full px-3 py-2 text-sm bg-white border transition;
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15);
+}
+
+/* ---------------------------
+   CARDS / SURFACES
+---------------------------- */
+.card {
+  background-color: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+/* ---------------------------
+   ANIMATIONS
+---------------------------- */
 @keyframes slideDown {
   0% {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-6px);
   }
   100% {
     opacity: 1;

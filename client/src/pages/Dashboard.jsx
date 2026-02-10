@@ -38,12 +38,12 @@ const Dashboard = () => {
       <Header />
 
       {/* Context + actions */}
-      <DashboardTopBar />
+      {/* <DashboardTopBar /> */}
 
       {/* Business overview */}
       <section className="space-y-4">
         <SummaryCards summary={data.summary} />
-        <BusinessSnapshot />
+        {/* <BusinessSnapshot /> */}
       </section>
 
       {/* Operational lists */}

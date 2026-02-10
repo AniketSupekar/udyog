@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { fetchOrders } from "../services/order.api";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
+import { Search, Plus, X } from "lucide-react";
 
 export default function OrdersList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -74,239 +75,222 @@ export default function OrdersList() {
   }, [debouncedSearch, status, filter, page, showDeleted]);
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* ================= TOP BAR ================= */}
-      <div className="flex flex-col md:flex-row md:justify-between gap-4">
-        <div>
-          <button
-  onClick={() => navigate(-1)}
-  className="text-sm text-green-600 hover:underline mb-1"
->
-  ← Back to Dashboard
-</button>
+    <div className="relative min-h-screen bg-gray-50">
+      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
 
+        {/* ================= HEADER ================= */}
+        <div className="space-y-1">
+          {isDashboardView && (
+            <button
+              onClick={() => navigate(-1)}
+              className="text-sm text-green-600 hover:underline"
+            >
+              ← Back to Dashboard
+            </button>
+          )}
 
-          <h2 className="text-xl font-semibold text-gray-800">
+          <h2 className="text-2xl font-semibold text-gray-900">
             {contextTitle || "Orders"}
           </h2>
 
           <p className="text-sm text-gray-500">
             {contextTitle
               ? "Showing filtered orders from dashboard"
-              : "Manage and track all customer orders"}
+              : "Search, filter and manage all customer orders"}
           </p>
         </div>
 
-        {/* ================= ACTIONS ================= */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search customer / phone"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border px-3 py-2 rounded-md text-sm"
-          />
-
-          <select
-            value={status}
-            onChange={(e) => {
-              setPage(1);
-              const value = e.target.value;
-              const params = Object.fromEntries(searchParams.entries());
-
-              if (value) params.status = value;
-              else delete params.status;
-
-              setSearchParams(params);
-            }}
-            className="border px-3 py-2 rounded-md text-sm"
-          >
-            <option value="">All Status</option>
-            <option value="CREATED">CREATED</option>
-            <option value="PENDING">PENDING</option>
-            <option value="DELIVERED">DELIVERED</option>
-          </select>
-
-          {!isDashboardView && (
-            <>
+        {/* ================= SEARCH + FILTERS ================= */}
+        <div className="flex flex-col md:flex-row gap-3 md:items-center">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              placeholder="Search customer or phone…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            {search && (
               <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Status chips */}
+          <div className="flex gap-2 flex-wrap">
+            {["", "CREATED", "PENDING", "DELIVERED"].map((s) => (
+              <button
+                key={s || "ALL"}
                 onClick={() => {
                   setPage(1);
-                  setShowDeleted(!showDeleted);
+                  const params = Object.fromEntries(searchParams.entries());
+                  if (s) params.status = s;
+                  else delete params.status;
+                  setSearchParams(params);
                 }}
-                className="bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-md hover:bg-gray-300 transition"
+                className={`px-4 py-2 rounded-full text-xs font-medium transition ${status === s || (!s && !status)
+                    ? "bg-green-600 text-white"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
               >
-                {showDeleted ? "Hide Deleted" : "Show Deleted"}
+                {s || "All"}
               </button>
-
-              <Link
-                to="/create"
-                className="bg-green-600 text-white text-sm px-4 py-2 rounded-md hover:bg-green-700 transition"
-              >
-                + Create Order
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ================= CONTENT ================= */}
-      {initialLoading ? (
-        <div className="p-6 text-center text-gray-500">Loading orders...</div>
-      ) : orders.length === 0 ? (
-        <p className="text-center text-gray-500">No orders found.</p>
-      ) : (
-        <>
-          {fetching && (
-            <p className="text-sm text-gray-400 text-center">
-              Updating results…
-            </p>
-          )}
-
-          {/* MOBILE VIEW */}
-          <div className="space-y-4 md:hidden">
-            {orders.map((order) => (
-              <div
-                key={order._id}
-                className={`bg-white rounded-xl shadow-sm p-4 space-y-3 ${
-                  order.isDeleted ? "bg-gray-100 opacity-60" : ""
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${
-                        order.isDeleted
-                          ? "line-through text-gray-500"
-                          : "text-gray-800"
-                      }`}
-                    >
-                      {order.customer.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Delivery: {order.deliveryDate.slice(0, 10)}
-                    </p>
-                  </div>
-                  <StatusBadge status={order.status} />
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <p
-                    className={`text-lg font-semibold ${
-                      order.isDeleted
-                        ? "text-gray-400 line-through"
-                        : "text-gray-900"
-                    }`}
-                  >
-                    ₹ {order.totalAmount}
-                  </p>
-                  <Link
-                    to={`/order/${order._id}`}
-                    className={`text-sm font-medium ${
-                      order.isDeleted
-                        ? "text-gray-400"
-                        : "text-green-600"
-                    }`}
-                  >
-                    View →
-                  </Link>
-                </div>
-              </div>
             ))}
           </div>
 
-          {/* DESKTOP VIEW */}
-          <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-            <table className="w-full border-collapse">
-              <thead className="bg-gray-50 text-gray-600 text-sm">
-                <tr>
-                  <th className="text-left px-6 py-4 border-b border-r border-gray-200">
-                    Customer
-                  </th>
-                  <th className="text-left px-6 py-4 border-b border-r border-gray-200">
-                    Delivery Date
-                  </th>
-                  <th className="text-right px-6 py-4 border-b border-r border-gray-200">
-                    Total
-                  </th>
-                  <th className="text-left px-6 py-4 border-b border-r border-gray-200">
-                    Status
-                  </th>
-                  <th className="text-center px-6 py-4 border-b border-gray-200">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="text-sm">
-                {orders.map((order) => (
-                  <tr
-                    key={order._id}
-                    className={`hover:bg-gray-50 transition ${
-                      order.isDeleted
-                        ? "bg-gray-100 opacity-60"
-                        : "bg-white"
-                    }`}
-                  >
-                    <td className="px-6 py-4 font-medium text-gray-800 border-b border-r border-gray-200">
-                      {order.customer.name}
-                    </td>
-
-                    <td className="px-6 py-4 text-gray-600 border-b border-r border-gray-200">
-                      {order.deliveryDate.slice(0, 10)}
-                    </td>
-
-                    <td className="px-6 py-4 text-right font-semibold text-gray-900 border-b border-r border-gray-200">
-                      ₹ {order.totalAmount}
-                    </td>
-
-                    <td className="px-6 py-4 border-b border-r border-gray-200">
-                      <StatusBadge status={order.status} />
-                    </td>
-
-                    <td className="px-6 py-4 text-center border-b border-gray-200">
-                      <Link
-                        to={`/order/${order._id}`}
-                        className={`font-medium hover:underline ${
-                          order.isDeleted
-                            ? "text-gray-400"
-                            : "text-green-600"
-                        }`}
-                      >
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* PAGINATION */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 pt-4">
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-                className="px-3 py-1 border rounded disabled:opacity-50"
+          {/* Desktop Create */}
+          {!isDashboardView && (
+            <div className="hidden md:block ml-auto">
+              <Link
+                to="/create"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition"
               >
-                Prev
-              </button>
-
-              <span className="text-sm text-gray-600">
-                Page {page} of {totalPages}
-              </span>
-
-              <button
-                disabled={page === totalPages}
-                onClick={() => setPage(page + 1)}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Next
-              </button>
+                <Plus size={16} />
+                Create Order
+              </Link>
             </div>
           )}
-        </>
+        </div>
+
+        {/* ================= CONTENT ================= */}
+        {initialLoading ? (
+          <div className="py-16 text-center text-gray-500">
+            Loading orders…
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="py-20 text-center text-gray-500">
+            No orders found.
+          </div>
+        ) : (
+          <>
+            {fetching && (
+              <p className="text-xs text-center text-gray-400">
+                Updating results…
+              </p>
+            )}
+
+            {/* MOBILE LIST */}
+            <div className="space-y-4 md:hidden">
+              {orders.map((order) => (
+                <div
+                  key={order._id}
+                  className={`rounded-2xl bg-white p-4 shadow-sm space-y-3 ${order.isDeleted && "opacity-60"
+                    }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {order.customer.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Delivery · {order.deliveryDate.slice(0, 10)}
+                      </p>
+                    </div>
+                    <StatusBadge status={order.status} />
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <p className="text-lg font-semibold text-gray-900">
+                      ₹ {order.totalAmount}
+                    </p>
+                    <Link
+                      to={`/order/${order._id}`}
+                      className="text-sm font-medium text-green-600"
+                    >
+                      View →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* DESKTOP TABLE (cleaned) */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-6 py-4 text-left">Customer</th>
+                    <th className="px-6 py-4 text-left">Delivery</th>
+                    <th className="px-6 py-4 text-right">Total</th>
+                    <th className="px-6 py-4 text-left">Status</th>
+                    <th className="px-6 py-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr
+                      key={order._id}
+                      className="border-t hover:bg-gray-50 transition"
+                    >
+                      <td className="px-6 py-4 font-medium">
+                        {order.customer.name}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {order.deliveryDate.slice(0, 10)}
+                      </td>
+                      <td className="px-6 py-4 text-right font-semibold">
+                        ₹ {order.totalAmount}
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <Link
+                          to={`/order/${order._id}`}
+                          className="text-green-600 font-medium hover:underline"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* PAGINATION */}
+            {totalPages > 1 && (
+              <div className="flex justify-center gap-4 pt-6">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                  className="px-4 py-2 rounded-lg border disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-gray-600">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  disabled={page === totalPages}
+                  onClick={() => setPage(page + 1)}
+                  className="px-4 py-2 rounded-lg border disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* MOBILE FAB */}
+      {!isDashboardView && (
+        <Link
+          to="/create"
+          className="fixed bottom-20 right-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-600 text-white shadow-lg md:hidden"
+        >
+          <Plus size={24} />
+        </Link>
       )}
     </div>
   );
