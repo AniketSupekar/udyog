@@ -1,39 +1,103 @@
 import { useNavigate } from "react-router-dom";
+import {
+  Calendar,
+  AlertTriangle,
+  Clock,
+  Hourglass
+} from "lucide-react";
+
+const cardConfig = {
+  dueToday: {
+    label: "Due Today",
+    icon: Calendar,
+    bg: "bg-yellow-100",
+    iconBg: "bg-white/80",
+    iconColor: "text-yellow-700",
+    route: "/order?filter=due-today"
+  },
+  overdue: {
+    label: "Overdue",
+    icon: AlertTriangle,
+    bg: "bg-red-100",
+    iconBg: "bg-white/80",
+    iconColor: "text-red-700",
+    route: "/order?filter=overdue"
+  },
+  upcoming: {
+    label: "Upcoming",
+    icon: Clock,
+    bg: "bg-blue-100",
+    iconBg: "bg-white/80",
+    iconColor: "text-blue-700",
+    route: "/order?filter=upcoming"
+  },
+  pending: {
+    label: "Pending",
+    icon: Hourglass,
+    bg: "bg-purple-100",
+    iconBg: "bg-white/80",
+    iconColor: "text-purple-700",
+    route: "/order?status=PENDING"
+  }
+};
 
 const SummaryCards = ({ summary }) => {
   const navigate = useNavigate();
-
   if (!summary) return null;
 
   const cards = [
-    { label: "Due Today", value: summary.dueToday, route: "/order?filter=due-today" },
-    { label: "Overdue", value: summary.overdue, route: "/order?filter=overdue", highlight: true },
-    { label: "Upcoming", value: summary.upcoming, route: "/order?filter=upcoming" },
-    { label: "Pending", value: summary.pending, route: "/order?status=PENDING" }
+    { type: "dueToday", value: summary.dueToday },
+    { type: "overdue", value: summary.overdue },
+    { type: "upcoming", value: summary.upcoming },
+    { type: "pending", value: summary.pending }
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-      {cards.map(card => (
-        <button
-          key={card.label}
-          onClick={() => navigate(card.route)}
-          className={`
-            rounded-xl p-4 text-left border bg-white
-            transition active:scale-[0.98] md:hover:shadow-md
-            ${card.highlight ? "border-red-200 bg-red-50/60" : "border-gray-200"}
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {cards.map(({ type, value }) => {
+        const config = cardConfig[type];
+        const Icon = config.icon;
+
+        return (
+          <button
+            key={config.label}
+            onClick={() => navigate(config.route)}
+            className={`
+            ${config.bg}
+            rounded-xl p-4 text-left
+            transition-all duration-200
+            hover:shadow-md hover:-translate-y-[2px]
+            active:scale-[0.98]
           `}
-        >
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-            {card.label}
-          </div>
-          <div className="mt-1 text-2xl font-semibold text-gray-900">
-            {card.value}
-          </div>
-        </button>
-      ))}
+          >
+            {/* Icon */}
+            <div
+              className={`
+              w-9 h-9 rounded-lg
+              ${config.iconBg}
+              flex items-center justify-center
+              mb-3
+            `}
+            >
+              <Icon className={`w-4.5 h-4.5 ${config.iconColor}`} />
+            </div>
+
+            {/* Count */}
+            <div className="text-2xl font-bold text-gray-900 leading-tight">
+              {value}
+            </div>
+
+            {/* Label */}
+            <div className="mt-1 text-sm font-medium text-gray-600">
+              {config.label}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
+
+
 };
 
 export default SummaryCards;

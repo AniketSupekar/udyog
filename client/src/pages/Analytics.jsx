@@ -18,7 +18,7 @@ export default function Analytics() {
       <BusinessSnapshot />
 
       {/* Info / Tip */}
-      <div className="rounded-2xl border bg-gray-50 p-5">
+      <div className="rounded-2xl border bg-gray-50 p-5 ">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 text-green-600">
             <Info size={18} />

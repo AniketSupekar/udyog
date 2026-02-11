@@ -2,11 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { fetchOrders } from "../services/order.api";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
-import { Search, Plus, X } from "lucide-react";
+import { Search, Plus, X, Filter } from "lucide-react";
 
 export default function OrdersList() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const filter = searchParams.get("filter"); // upcoming | overdue | due-today | null
+  const filter = searchParams.get("filter");
   const status = searchParams.get("status") || "";
 
   const navigate = useNavigate();
@@ -18,23 +18,24 @@ export default function OrdersList() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const debounceRef = useRef(null);
 
-  /* ================= DASHBOARD CONTEXT ================= */
   const isDashboardView = Boolean(filter || status);
 
   const contextTitle = (() => {
     if (filter === "overdue") return "Overdue Orders";
     if (filter === "due-today") return "Due Today Orders";
     if (filter === "upcoming") return "Upcoming Orders";
-    if (status) return `${status.charAt(0)}${status.slice(1).toLowerCase()} Orders`;
+    if (status)
+      return `${status.charAt(0)}${status.slice(1).toLowerCase()} Orders`;
     return null;
   })();
 
-  /* ================= SEARCH DEBOUNCE ================= */
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -46,7 +47,6 @@ export default function OrdersList() {
     return () => clearTimeout(debounceRef.current);
   }, [search]);
 
-  /* ================= DATA FETCH ================= */
   const loadOrders = async (isInitial = false) => {
     isInitial ? setInitialLoading(true) : setFetching(true);
 
@@ -78,7 +78,7 @@ export default function OrdersList() {
     <div className="relative min-h-screen bg-gray-50">
       <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
 
-        {/* ================= HEADER ================= */}
+        {/* HEADER */}
         <div className="space-y-1">
           {isDashboardView && (
             <button
@@ -96,13 +96,12 @@ export default function OrdersList() {
           <p className="text-sm text-gray-500">
             {contextTitle
               ? "Showing filtered orders from dashboard"
-              : "Search, filter and manage all customer orders"}
+              : "Search and manage all customer orders"}
           </p>
         </div>
 
-        {/* ================= SEARCH + FILTERS ================= */}
-        <div className="flex flex-col md:flex-row gap-3 md:items-center">
-          {/* Search */}
+        {/* SEARCH + FILTER BUTTON */}
+        <div className="flex gap-3 items-center">
           <div className="relative flex-1">
             <Search
               size={18}
@@ -110,44 +109,32 @@ export default function OrdersList() {
             />
             <input
               type="text"
-              placeholder="Search customer or phone…"
+              placeholder="Search customer or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-9 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
               >
                 <X size={16} />
               </button>
             )}
           </div>
 
-          {/* Status chips */}
-          <div className="flex gap-2 flex-wrap">
-            {["", "CREATED", "PENDING", "DELIVERED"].map((s) => (
-              <button
-                key={s || "ALL"}
-                onClick={() => {
-                  setPage(1);
-                  const params = Object.fromEntries(searchParams.entries());
-                  if (s) params.status = s;
-                  else delete params.status;
-                  setSearchParams(params);
-                }}
-                className={`px-4 py-2 rounded-full text-xs font-medium transition ${status === s || (!s && !status)
-                    ? "bg-green-600 text-white"
-                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
-                  }`}
-              >
-                {s || "All"}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`h-12 w-12 rounded-xl border flex items-center justify-center transition ${
+              showFilters
+                ? "bg-green-600 text-white border-green-600"
+                : "bg-white border-gray-200 text-green-600"
+            }`}
+          >
+            <Filter size={18} />
+          </button>
 
-          {/* Desktop Create */}
           {!isDashboardView && (
             <div className="hidden md:block ml-auto">
               <Link
@@ -161,7 +148,41 @@ export default function OrdersList() {
           )}
         </div>
 
-        {/* ================= CONTENT ================= */}
+        {/* COLLAPSIBLE FILTER PANEL */}
+        {showFilters && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Status
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {["", "CREATED", "PENDING", "DELIVERED"].map((s) => (
+                <button
+                  key={s || "ALL"}
+                  onClick={() => {
+                    setPage(1);
+                    const params = Object.fromEntries(
+                      searchParams.entries()
+                    );
+                    if (s) params.status = s;
+                    else delete params.status;
+                    setSearchParams(params);
+                    setShowFilters(false);
+                  }}
+                  className={`px-4 py-2 rounded-full text-xs font-medium transition ${
+                    status === s || (!s && !status)
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {s || "All"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CONTENT */}
         {initialLoading ? (
           <div className="py-16 text-center text-gray-500">
             Loading orders…
@@ -178,49 +199,67 @@ export default function OrdersList() {
               </p>
             )}
 
-            {/* MOBILE LIST */}
-            <div className="space-y-4 md:hidden">
+            {/* MOBILE LIST (Upgraded Structure) */}
+            <div className="space-y-3 md:hidden">
               {orders.map((order) => (
-                <div
+                <Link
                   key={order._id}
-                  className={`rounded-2xl bg-white p-4 shadow-sm space-y-3 ${order.isDeleted && "opacity-60"
-                    }`}
+                  to={`/order/${order._id}`}
+                  className={`block bg-white border border-gray-200 rounded-2xl p-4 transition hover:shadow-sm ${
+                    order.isDeleted ? "opacity-60" : ""
+                  }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-semibold text-gray-900">
                         {order.customer.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Delivery · {order.deliveryDate.slice(0, 10)}
                       </p>
                     </div>
                     <StatusBadge status={order.status} />
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <p className="text-lg font-semibold text-gray-900">
-                      ₹ {order.totalAmount}
-                    </p>
-                    <Link
-                      to={`/order/${order._id}`}
-                      className="text-sm font-medium text-green-600"
-                    >
-                      View →
-                    </Link>
+                  <div className="h-px bg-gray-100 my-3" />
+
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-[11px] text-gray-400 uppercase tracking-wide">
+                        Delivery
+                      </p>
+                      <p className="text-sm font-medium text-gray-800">
+                        {order.deliveryDate.slice(0, 10)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] text-gray-400 uppercase tracking-wide">
+                        Quantity
+                      </p>
+                      <p className="text-sm font-medium text-gray-800">
+                        {order.quantity}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] text-gray-400 uppercase tracking-wide">
+                        Remaining
+                      </p>
+                      <p className="text-sm font-semibold text-red-600">
+                        ₹ {order.remainingAmount}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 
-            {/* DESKTOP TABLE (cleaned) */}
+            {/* DESKTOP TABLE */}
             <div className="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
                     <th className="px-6 py-4 text-left">Customer</th>
                     <th className="px-6 py-4 text-left">Delivery</th>
-                    <th className="px-6 py-4 text-right">Total</th>
+                    <th className="px-6 py-4 text-right">Remaining</th>
                     <th className="px-6 py-4 text-left">Status</th>
                     <th className="px-6 py-4 text-center">Action</th>
                   </tr>
@@ -237,8 +276,8 @@ export default function OrdersList() {
                       <td className="px-6 py-4 text-gray-600">
                         {order.deliveryDate.slice(0, 10)}
                       </td>
-                      <td className="px-6 py-4 text-right font-semibold">
-                        ₹ {order.totalAmount}
+                      <td className="px-6 py-4 text-right font-semibold text-red-600">
+                        ₹ {order.remainingAmount}
                       </td>
                       <td className="px-6 py-4">
                         <StatusBadge status={order.status} />
@@ -283,7 +322,6 @@ export default function OrdersList() {
         )}
       </div>
 
-      {/* MOBILE FAB */}
       {!isDashboardView && (
         <Link
           to="/create"
