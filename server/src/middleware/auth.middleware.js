@@ -1,36 +1,29 @@
+// src/middleware/auth.middleware.js
+// Zero DB calls — JWT contains everything we need (userId + businessId)
+// Uses ApiError so all auth failures flow through globalErrorHandler
+
 import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
+import { ApiError } from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
 
-/**
- * OPTIMIZATION NOTES:
- * - Removed DB call (User.findById)
- * - JWT already contains userId + nurseryId
- * - This middleware now does ZERO database work
- * - Massive latency reduction on every protected route
- */
-
-export const protect = async (req, res, next) => {
+export const protect = asyncHandler(async (req, res, next) => {
   const token = req.cookies?.token;
 
   if (!token) {
-    return res.status(401).json({ message: "Not authenticated" });
+    throw ApiError.unauthorized("Not authenticated");
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const decoded = jwt.verify(token, env.JWT_SECRET);
 
-    if (!decoded?.userId || !decoded?.nurseryId) {
-      return res.status(403).json({
-        message: "User is not assigned to any nursery"
-      });
-    }
-
-    req.user = {
-      userId: decoded.userId,
-      nurseryId: decoded.nurseryId
-    };
-
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+  if (!decoded?.userId || !decoded?.businessId) {
+    throw ApiError.forbidden("User is not assigned to any business");
   }
-};
+
+  req.user = {
+    userId: decoded.userId,
+    businessId: decoded.businessId,
+  };
+
+  next();
+});

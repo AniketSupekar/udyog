@@ -1,390 +1,371 @@
+// src/pages/OrderDetails.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   fetchOrderById,
   updateOrderStatus,
   softDeleteOrder,
-  updateOrderDetails
+  updateOrderDetails,
+  recordPayment,
 } from "../services/order.api";
-import Layout from "../components/Layout";
-import Header from "../components/Header";
 import StatusBadge from "../components/StatusBadge";
 import BillModal from "../components/bill/BillModal";
+import RecordPaymentModal from "../components/payments/RecordPaymentModal";
+import { formatDate, toInputDate } from "../utils/date.util";
+import { formatCurrency } from "../utils/currency.util";
+import { getConfirmationUrl, getPaymentReminderUrl, getBillUrl } from "../utils/whatsapp.util";
+import { MessageCircle, Trash2, Edit2, X, Check } from "lucide-react";
+
+const STATUS_TRANSITIONS = {
+  CREATED: ["PENDING"],
+  PENDING: ["DELIVERED"],
+  DELIVERED: [],
+  CANCELLED: [],
+};
 
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [order, setOrder] = useState(null);
-
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
-
   const [showBill, setShowBill] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  // Hardcoded business name for now — will come from business profile later
+  const businessName = "My Business";
+
+  useEffect(() => {
+    fetchOrderById(id)
+      .then(setOrder)
+      .catch(() => navigate("/orders"))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const handleStatusChange = async (nextStatus) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to mark this order as ${nextStatus}?`
-    );
-    if (!confirmed) return;
-
+    if (!window.confirm(`Mark this order as ${nextStatus}?`)) return;
     try {
       const updated = await updateOrderStatus(order._id, nextStatus);
       setOrder(updated);
     } catch (err) {
-      alert(err.message || "Failed to update status");
+      alert(err.response?.data?.message || "Failed to update status");
     }
   };
 
   const handleDelete = async () => {
-    const confirmed = window.confirm("Are you sure you want to delete this order?");
-    if (!confirmed) return;
-
+    if (!window.confirm("Delete this order? This cannot be undone.")) return;
     try {
       await softDeleteOrder(order._id);
-      navigate("/");
+      navigate("/orders");
     } catch (err) {
-      alert(err.message || "Failed to delete order");
+      alert(err.response?.data?.message || "Failed to delete");
     }
   };
 
   const handleEditStart = () => {
     setFormData({
-      quantity: order.quantity,
-      rate: order.rate,
-      advancePaid: order.advancePaid,
-      orderDate: order.orderDate.slice(0, 10),
-      deliveryDate: order.deliveryDate.slice(0, 10),
-      customer: {
-        name: order.customer.name,
-        phone: order.customer.phone,
-        address: order.customer.address
-      }
+      clientSnapshot: { ...order.clientSnapshot },
+      orderDate: toInputDate(order.orderDate),
+      deliveryDate: toInputDate(order.deliveryDate),
+      notes: order.notes || "",
     });
     setIsEditing(true);
   };
 
-  // ✅ NEW: save edited order
   const handleSave = async () => {
-    const confirmed = window.confirm("Do you want to save the changes?");
-    if (!confirmed) return;
-
+    if (!window.confirm("Save changes?")) return;
     try {
       const updated = await updateOrderDetails(order._id, formData);
       setOrder(updated);
       setIsEditing(false);
-      alert("Order updated successfully");
     } catch (err) {
-      alert(err.message || "Failed to update order");
+      alert(err.response?.data?.message || "Failed to update order");
     }
   };
 
-  useEffect(() => {
-    fetchOrderById(id).then(setOrder);
-  }, [id]);
+  const handlePaymentRecorded = (updatedOrder) => {
+    setOrder(updatedOrder);
+    setShowPaymentModal(false);
+  };
 
-  if (!order) {
-    return (
-      <Layout>
-        <Header />
-        <div className="p-6 text-center text-gray-500">
-          Loading order details...
-        </div>
-      </Layout>
-    );
+  if (loading) {
+    return <div className="p-6 text-center text-gray-500">Loading order details…</div>;
   }
 
-  const isEditable = order.status !== "DELIVERED" && !order.isDeleted;
+  if (!order) return null;
+
+  const isEditable = !["DELIVERED", "CANCELLED"].includes(order.status) && !order.isDeleted;
+  const nextStatuses = STATUS_TRANSITIONS[order.status] || [];
 
   return (
     <>
-      {/* <Header /> */}
+      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
 
-      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
-        {/* ================= HEADER ================= */}
+        {/* ── HEADER ── */}
         <div className="flex justify-between items-start">
           <div>
-            <button
-              onClick={() => navigate(-1)}
-              className="text-sm text-green-600 hover:underline mb-1"
-            >
+            <button onClick={() => navigate(-1)} className="text-sm text-green-600 hover:underline mb-1 block">
               ← Back
             </button>
-
-            <h2 className="text-xl font-semibold text-gray-800">
-              Order Details
-            </h2>
-
-            <p className="text-sm text-gray-500">
-              Order ID: {order._id}
-            </p>
+            <h2 className="text-xl font-semibold text-gray-800">Order Details</h2>
+            <p className="text-xs text-gray-400 mt-0.5">ID: {order._id}</p>
           </div>
-
           <StatusBadge status={order.status} />
         </div>
 
-        {/* ================= ACTIONS ================= */}
-        <div className="flex justify-between items-center pt-4 border-t">
+        {/* ── ACTION BAR ── */}
+        <div className="flex flex-wrap gap-2 pt-2 border-t">
           {isEditable && !isEditing && (
+            <button onClick={handleEditStart} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+              <Edit2 size={14} /> Edit
+            </button>
+          )}
+          {isEditing && (
+            <>
+              <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                <Check size={14} /> Save
+              </button>
+              <button onClick={() => setIsEditing(false)} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+                <X size={14} /> Cancel
+              </button>
+            </>
+          )}
+
+          {nextStatuses.map((s) => (
             <button
-              onClick={handleEditStart}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+              key={s}
+              onClick={() => handleStatusChange(s)}
+              className={`px-4 py-2 text-sm rounded-lg text-white transition ${s === "DELIVERED" ? "bg-green-600 hover:bg-green-700" : "bg-yellow-500 hover:bg-yellow-600"}`}
             >
-              Edit Order
+              Mark as {s}
+            </button>
+          ))}
+
+          {order.payment?.remainingAmount > 0 && (
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              Record Payment
             </button>
           )}
 
-          {isEditing && (
-            <div className="flex gap-3">
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition"
-              >
-                Save Changes
-              </button>
-
-              <button
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
-              >
-                Cancel
-              </button>
-            </div>
+          {!order.isDeleted && (
+            <button onClick={() => setShowBill(true)} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+              Generate Bill
+            </button>
           )}
 
-          <div className="flex gap-3">
-
-
-            {/* <button
-                  onClick={() => setShowBill(true)}
-                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
-                >
-                  Generate Bill
-                </button> */}
-
-            {order.status !== "DELIVERED" && (
-              <>
-                {order.status === "CREATED" && (
-                  <button
-                    onClick={() => handleStatusChange("PENDING")}
-                    className="px-4 py-2 text-sm bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition"
-                  >
-                    Mark as Pending
-                  </button>
-                )}
-
-                {order.status === "PENDING" && (
-                  <button
-                    onClick={() => handleStatusChange("DELIVERED")}
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition"
-                  >
-                    Mark as Delivered
-                  </button>
-                )}
-              </>
-            )}
-
-            {order.status === "DELIVERED" && !order.isDeleted && (
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition"
-              >
-                Delete Order
-              </button>
-            )}
-          </div>
+          {isEditable && (
+            <button onClick={handleDelete} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition ml-auto">
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
         </div>
 
-        {/* ================= CUSTOMER INFO ================= */}
+        {/* ── WHATSAPP ACTIONS ── */}
+        {order.clientSnapshot?.phone && (
+          <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">WhatsApp</p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={getConfirmationUrl(order, businessName)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                <MessageCircle size={13} /> Order Confirmation
+              </a>
+              {order.payment?.remainingAmount > 0 && (
+                <a
+                  href={getPaymentReminderUrl(order, businessName)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
+                >
+                  <MessageCircle size={13} /> Payment Reminder
+                </a>
+              )}
+              <a
+                href={getBillUrl(order, businessName)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+              >
+                <MessageCircle size={13} /> Send Bill
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* ── CUSTOMER INFO ── */}
         <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-          <h3 className="text-sm font-medium text-gray-600">
-            Customer Information
-          </h3>
-
+          <h3 className="text-sm font-semibold text-gray-600">Customer Information</h3>
           {isEditing ? (
-            <>
+            <div className="space-y-2">
               <input
-                type="text"
-                value={formData.customer.name}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    customer: { ...formData.customer, name: e.target.value }
-                  })
-                }
-                className="w-full border rounded px-2 py-1"
-                placeholder="Customer Name"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Name"
+                value={formData.clientSnapshot?.name || ""}
+                onChange={(e) => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, name: e.target.value } })}
               />
-
               <input
-                type="text"
-                value={formData.customer.phone}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    customer: { ...formData.customer, phone: e.target.value }
-                  })
-                }
-                className="w-full border rounded px-2 py-1"
-                placeholder="Phone Number"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Phone"
+                value={formData.clientSnapshot?.phone || ""}
+                onChange={(e) => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, phone: e.target.value } })}
               />
-
-              <textarea
-                value={formData.customer.address}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    customer: { ...formData.customer, address: e.target.value }
-                  })
-                }
-                className="w-full border rounded px-2 py-1"
+              <input
+                className="w-full border rounded-lg px-3 py-2 text-sm"
                 placeholder="Address"
-                rows={2}
+                value={formData.clientSnapshot?.address || ""}
+                onChange={(e) => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, address: e.target.value } })}
               />
-            </>
+            </div>
           ) : (
             <>
-              <p className="text-base font-medium text-gray-800">
-                {order.customer.name}
-              </p>
-              <p className="text-sm text-gray-600">📞 {order.customer.phone}</p>
-              <p className="text-sm text-gray-600">📍 {order.customer.address}</p>
+              <p className="font-medium text-gray-900">{order.clientSnapshot?.name}</p>
+              <p className="text-sm text-gray-600">📞 {order.clientSnapshot?.phone}</p>
+              {order.clientSnapshot?.address && (
+                <p className="text-sm text-gray-600">📍 {order.clientSnapshot?.address}</p>
+              )}
             </>
           )}
         </div>
-        {/* ================= ORDER SUMMARY ================= */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
-          <h3 className="text-sm font-medium text-gray-600">Order Summary</h3>
 
+        {/* ── DATES ── */}
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3">Dates</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-500">Quantity</p>
-              {isEditing ? (
-                <input
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, quantity: e.target.value })
-                  }
-                  className="w-full border rounded px-2 py-1"
-                />
-              ) : (
-                <p className="font-medium text-gray-800">{order.quantity}</p>
-              )}
-            </div>
-
-            <div>
-              <p className="text-gray-500">Rate</p>
-              {isEditing ? (
-                <input
-                  type="number"
-                  value={formData.rate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, rate: e.target.value })
-                  }
-                  className="w-full border rounded px-2 py-1"
-                />
-              ) : (
-                <p className="font-medium text-gray-800">₹ {order.rate}</p>
-              )}
-            </div>
-
             <div>
               <p className="text-gray-500">Order Date</p>
               {isEditing ? (
-                <input
-                  type="date"
-                  value={formData.orderDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, orderDate: e.target.value })
-                  }
-                  className="w-full border rounded px-2 py-1"
-                />
+                <input type="date" className="border rounded-lg px-3 py-2 text-sm w-full mt-1" value={formData.orderDate} onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })} />
               ) : (
-                <p className="font-medium text-gray-800">
-                  {order.orderDate.slice(0, 10)}
-                </p>
+                <p className="font-medium text-gray-900 mt-1">{formatDate(order.orderDate)}</p>
               )}
             </div>
-
             <div>
               <p className="text-gray-500">Delivery Date</p>
               {isEditing ? (
-                <input
-                  type="date"
-                  value={formData.deliveryDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, deliveryDate: e.target.value })
-                  }
-                  className="w-full border rounded px-2 py-1"
-                />
+                <input type="date" className="border rounded-lg px-3 py-2 text-sm w-full mt-1" value={formData.deliveryDate} onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })} />
               ) : (
-                <p className="font-medium text-gray-800">
-                  {order.deliveryDate.slice(0, 10)}
-                </p>
+                <p className="font-medium text-gray-900 mt-1">{formatDate(order.deliveryDate)}</p>
               )}
             </div>
           </div>
         </div>
 
-        {/* ================= PAYMENT SUMMARY ================= */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
-          <h3 className="text-sm font-medium text-gray-600">Payment Summary</h3>
-
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-500">Total Amount</p>
-              <p className="font-semibold text-gray-900">
-                ₹ {order.totalAmount}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-gray-500">Advance Paid</p>
-              {isEditing ? (
-                <input
-                  type="number"
-                  value={formData.advancePaid}
-                  onChange={(e) =>
-                    setFormData({ ...formData, advancePaid: e.target.value })
-                  }
-                  className="w-full border rounded px-2 py-1"
-                />
-              ) : (
-                <p className="font-medium text-gray-800">
-                  ₹ {order.advancePaid}
-                </p>
-              )}
-            </div>
-
-            <div className="col-span-2 pt-2 border-t flex items-center justify-between">
-              <div>
-                <p className="text-gray-500">Remaining Amount</p>
-                <p className="text-lg font-semibold text-red-600">
-                  ₹ {order.remainingAmount}
-                </p>
+        {/* ── ORDER ITEMS ── */}
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3">Order Items</h3>
+          <div className="space-y-2">
+            {order.items?.map((item, i) => (
+              <div key={i} className="flex justify-between items-center py-2 border-b last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{item.productName}</p>
+                  <p className="text-xs text-gray-500">{item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}</p>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.amount)}</p>
               </div>
-
-              <button
-                onClick={() => setShowBill(true)}
-                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition whitespace-nowrap"
-              >
-                Generate Bill
-              </button>
-            </div>
-
-
+            ))}
           </div>
         </div>
+
+        {/* ── PAYMENT SUMMARY ── */}
+        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-600">Payment Summary</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>Subtotal</span>
+              <span>{formatCurrency(order.financial?.subtotal)}</span>
+            </div>
+            {order.financial?.discountAmount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Discount</span>
+                <span>-{formatCurrency(order.financial?.discountAmount)}</span>
+              </div>
+            )}
+            {order.financial?.taxAmount > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>Tax ({order.financial?.taxRate}%)</span>
+                <span>{formatCurrency(order.financial?.taxAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold text-gray-900 border-t pt-2 text-base">
+              <span>Total</span>
+              <span>{formatCurrency(order.financial?.total)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Total Paid</span>
+              <span className="text-green-600">{formatCurrency(order.payment?.totalPaid)}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-red-600 text-base">
+              <span>Balance Due</span>
+              <span>{formatCurrency(order.payment?.remainingAmount)}</span>
+            </div>
+          </div>
+
+          {/* Payment Status Badge */}
+          <div className="pt-2 border-t">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+              order.payment?.status === "PAID" ? "bg-green-100 text-green-700" :
+              order.payment?.status === "PARTIAL" ? "bg-yellow-100 text-yellow-700" :
+              "bg-red-100 text-red-700"
+            }`}>
+              {order.payment?.status}
+            </span>
+          </div>
+        </div>
+
+        {/* ── PAYMENT HISTORY ── */}
+        {order.payment?.transactions?.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h3 className="text-sm font-semibold text-gray-600 mb-3">Payment History</h3>
+            <div className="space-y-2">
+              {order.payment.transactions.map((txn, i) => (
+                <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
+                  <div>
+                    <p className="font-medium text-gray-900">{formatCurrency(txn.amount)}</p>
+                    <p className="text-xs text-gray-500">{txn.method} · {formatDate(txn.recordedAt)}</p>
+                    {txn.note && <p className="text-xs text-gray-400">{txn.note}</p>}
+                  </div>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{txn.method}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── NOTES ── */}
+        {(order.notes || isEditing) && (
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">Notes</h3>
+            {isEditing ? (
+              <textarea
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                rows={3}
+                value={formData.notes || ""}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Add order notes..."
+              />
+            ) : (
+              <p className="text-sm text-gray-700">{order.notes}</p>
+            )}
+          </div>
+        )}
       </div>
 
-      {showBill && (
-        <BillModal
+      {showBill && <BillModal order={order} onClose={() => setShowBill(false)} />}
+      {showPaymentModal && (
+        <RecordPaymentModal
           order={order}
-          onClose={() => setShowBill(false)}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentRecorded}
         />
       )}
-
     </>
   );
 }

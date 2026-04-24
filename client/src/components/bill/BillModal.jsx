@@ -1,62 +1,60 @@
-import React, { useRef } from "react";
-import BillPreview from "../BillPreview.jsx";
+// src/components/bill/BillModal.jsx
+import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
+import BillPreview from "./BillPreview";
+import { getBillUrl } from "../../utils/whatsapp.util";
+import { MessageCircle, Printer, X } from "lucide-react";
 
-export default function BillModal({ order, onClose }) {
+export default function BillModal({ order, onClose, business }) {
   const billRef = useRef(null);
 
-  if (!order) return null;
-
   const handlePrint = useReactToPrint({
-  contentRef: billRef,
+    contentRef: billRef,
+    documentTitle: `Invoice_${order.clientSnapshot?.name?.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}`,
+  });
 
-  documentTitle: (() => {
-    const rawName = order.customer.name || "Customer";
-
-    // Sanitize name → safe for filenames
-    const safeName = rawName
-      .trim()
-      .replace(/\s+/g, "_")          // spaces → _
-      .replace(/[^a-zA-Z0-9_]/g, ""); // remove special chars
-
-    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-
-    return `Invoice_${safeName}_${today}`;
-  })(),
-});
-
+  const whatsappUrl = getBillUrl(order, business?.name || "My Business", business?.upiId);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-center overflow-auto p-4 pb-24">
-      <div className="bg-white w-full max-w-3xl rounded-xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/50 flex justify-center items-start overflow-auto p-4 pb-24">
+      <div className="bg-white w-full max-w-3xl rounded-2xl overflow-hidden shadow-xl mt-4">
 
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-lg font-semibold">Bill Preview</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 text-xl"
-          >
-            ✕
+        {/* Header */}
+        <div className="flex justify-between items-center px-5 py-4 border-b">
+          <h2 className="text-base font-semibold text-gray-900">Bill Preview</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-4">
+        {/* Bill content */}
+        <div className="p-4 overflow-auto max-h-[65vh]">
           <div ref={billRef}>
-            <BillPreview order={order} />
+            <BillPreview order={order} business={business} />
           </div>
         </div>
 
-        <div className="p-4 border-t flex gap-3 justify-end">
+        {/* Actions */}
+        <div className="px-5 py-4 border-t flex flex-wrap gap-3 justify-end bg-gray-50">
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            >
+              <MessageCircle size={15} /> Send on WhatsApp
+            </a>
+          )}
           <button
             onClick={handlePrint}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
           >
-            Download PDF
+            <Printer size={15} /> Download PDF
           </button>
-
           <button
             onClick={onClose}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition"
+            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
           >
             Close
           </button>

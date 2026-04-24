@@ -11,8 +11,10 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         const res = await getMe();
-        setUser(res.data);
-      } catch (err) {
+        // API returns { success, message, data: { userId, businessId } }
+        // axios wraps it in res.data — so res.data.data is the actual user
+        setUser(res.data.data);
+      } catch {
         setUser(null);
       } finally {
         setLoading(false);
@@ -22,14 +24,13 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  // ✅ LOGOUT FUNCTION
   const logout = async () => {
     try {
-      await logoutApi(); // backend logout
+      await logoutApi();
     } catch (err) {
-      console.error("Logout API failed", err);
+      console.error("Logout failed", err);
     } finally {
-      setUser(null); // frontend logout (critical)
+      setUser(null);
     }
   };
 

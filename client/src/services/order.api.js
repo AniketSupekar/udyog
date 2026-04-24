@@ -1,38 +1,40 @@
+// src/services/order.api.js
 import api from "./api";
 
-export const fetchOrders = async ({
-  page = 1,
-  limit = 10,
-  search = "",
-  status = "",
-  filter = "",
-  showDeleted = false
-} = {}) => {
-  const params = {
-    page,
-    limit,
-    search,
-    status,
-    showDeleted
-  };
+// ─── Orders ──────────────────────────────────────────────────────────────────
 
-  if (filter) params.filter = filter;
-
+export const fetchOrders = async (params = {}) => {
   const { data } = await api.get("/orders", { params });
+  // Returns { success, data: [], pagination: {} }
   return data;
 };
 
-export const fetchOrderById = (id) =>
-  api.get(`/orders/${id}`).then(res => res.data);
+export const fetchOrderById = async (id) => {
+  const { data } = await api.get(`/orders/${id}`);
+  return data.data; // unwrap
+};
 
-export const createOrder = (data) =>
-  api.post("/orders", data).then(res => res.data);
+export const createOrder = async (payload) => {
+  const { data } = await api.post("/orders", payload);
+  return data.data;
+};
 
-export const updateOrderStatus = (id, status) =>
-  api.patch(`/orders/${id}/status`, { status }).then(res => res.data);
+export const updateOrderStatus = async (id, status) => {
+  const { data } = await api.patch(`/orders/${id}/status`, { status });
+  return data.data;
+};
 
-export const softDeleteOrder = (id) =>
-  api.patch(`/orders/${id}/delete`).then(res => res.data);
+export const updateOrderDetails = async (id, payload) => {
+  const { data } = await api.patch(`/orders/${id}`, payload);
+  return data.data;
+};
 
-export const updateOrderDetails = (id, data) =>
-  api.patch(`/orders/${id}`, data).then(res => res.data);
+export const recordPayment = async (id, payload) => {
+  const { data } = await api.post(`/orders/${id}/payments`, payload);
+  return data.data;
+};
+
+export const softDeleteOrder = async (id) => {
+  const { data } = await api.delete(`/orders/${id}`);
+  return data;
+};

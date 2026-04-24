@@ -1,82 +1,110 @@
+// src/app.js
+// Clean entry point — only middleware registration and route mounting
+// Zero business logic here
+// Order of middleware matters — do not reorder
+
+import "./config/env.js";
+import { env } from "./config/env.js";
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import connectDB from "./config/db.js";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 
-import "./models/Order.js";
-import "./models/User.js";
+import connectDB from "./config/db.js";
 
-import orderRoutes from "./routes/order.routes.js";
-import notificationRoutes from "./routes/notification.routes.js";
-import authRoutes from "./routes/auth.routes.js";
-import dashboardRoutes from "./routes/dashboard.routes.js";
+// Routes
+import authRoutes from "./modules/auth/auth.routes.js";
+import orderRoutes from "./modules/orders/order.routes.js";
+import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
+import notificationRoutes from "./modules/notifications/notification.routes.js";
+import businessRoutes from "./modules/business/business.routes.js";
 
-import { createTomorrowDeliveryNotifications } from "./services/notification.service.js";
-import Nursery from "./models/Nursery.js";
+// Middleware
+import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
+import { apiLimiter, authLimiter, cronLimiter } from "./middleware/rateLimiter.middleware.js";
 
-dotenv.config();
+// Services
+import { createTomorrowDeliveryNotifications } from "./modules/notifications/notification.service.js";
+import Business from "./models/Business.js";
+
+// Connect DB
 connectDB();
 
 const app = express();
+
+// ─── Trust proxy (needed for Railway / Render / Heroku) ───────────────────────
 app.set("trust proxy", 1);
 
-const allowedOrigins = process.env.CLIENT_ORIGIN
-  ? process.env.CLIENT_ORIGIN.split(",")
-  : [];
+// ─── Security headers (helmet handles XSS, clickjacking, etc.) ────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 
-if (process.env.NODE_ENV == "production") {
-  allowedOrigins.push("http://localhost:5173");
-}
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  ...(process.env.CLIENT_ORIGIN?.split(",") || []),
+  // Always allow localhost in dev
+  ...(env.isDev ? ["http://localhost:5173", "http://localhost:5174"] : []),
+];
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-
-      console.warn("Blocked CORS:", origin);
+      // Allow server-to-server (no origin) or known origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.warn("Blocked CORS from:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
-    credentials: true
+    credentials: true,
   })
 );
 
-app.use(express.json());
+// ─── Body parsers ─────────────────────────────────────────────────────────────
+app.use(express.json({ limit: "10kb" })); // Prevent large payload attacks
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
-app.use("/api/auth", authRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/dashboard", dashboardRoutes);
+// ─── Global rate limiter ──────────────────────────────────────────────────────
+app.use("/api", apiLimiter);
 
-app.get("/", (req, res) => {
-  res.send("API running");
+// ─── Health check (no auth, no rate limit) ────────────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({ success: true, status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.post("/api/notifications/run", async (req, res) => {
+// ─── API Routes ───────────────────────────────────────────────────────────────
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/business", businessRoutes);
+
+// ─── Cron endpoint (secured with cronLimiter) ─────────────────────────────────
+// Called by external scheduler (Vercel cron / uptime robot)
+app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
   try {
-    const nurseries = await Nursery.find({}, "_id");
+    const businesses = await Business.find({ isActive: true }, "_id");
     let totalCreated = 0;
 
-    for (const nursery of nurseries) {
-      const result = await createTomorrowDeliveryNotifications(nursery._id);
+    for (const business of businesses) {
+      const result = await createTomorrowDeliveryNotifications(business._id);
       totalCreated += result.created;
     }
 
-    console.log("Cron executed, notifications created:", totalCreated);
-
-    res.json({
-      success: true,
-      created: totalCreated
-    });
+    console.log(`[CRON] Notifications created: ${totalCreated}`);
+    res.json({ success: true, created: totalCreated });
   } catch (err) {
-    console.error("Cron execution failed:", err);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    next(err);
   }
 });
+
+// ─── 404 handler ──────────────────────────────────────────────────────────────
+app.use(notFoundHandler);
+
+// ─── Global error handler (must be last) ──────────────────────────────────────
+app.use(globalErrorHandler);
 
 export default app;
