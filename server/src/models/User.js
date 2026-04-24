@@ -1,30 +1,57 @@
+// src/models/User.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    nurseryId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Nursery",
+      ref: "Business",
       required: true,
+      index: true,
     },
+
     name: {
       type: String,
-      required: true,
-      trim: true
+      required: [true, "Name is required"],
+      trim: true,
+      maxlength: [100, "Name too long"],
     },
+
     email: {
       type: String,
-      required: true,
+      required: [true, "Email is required"],
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
     },
+
     passwordHash: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
+
+    role: {
+      type: String,
+      enum: ["ADMIN", "STAFF"],
+      default: "ADMIN",
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    collection: "users",
+  }
 );
+
+userSchema.index({ businessId: 1, email: 1 });
 
 export default mongoose.model("User", userSchema);

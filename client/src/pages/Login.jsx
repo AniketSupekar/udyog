@@ -1,3 +1,4 @@
+// src/pages/Login.jsx
 import { useState } from "react";
 import { login } from "../services/auth.api";
 import { useAuth } from "../context/AuthContext";
@@ -19,10 +20,11 @@ export default function Login() {
 
     try {
       const res = await login({ email, password });
-      setUser(res.data.user);
-      navigate("/");
+      // API returns { success, message, data: { id, name, email, businessId, role } }
+      setUser(res.data.data);
+      navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -34,47 +36,37 @@ export default function Login() {
         onSubmit={handleSubmit}
         className="w-full max-w-md bg-white rounded-2xl shadow-lg px-8 py-10 space-y-6"
       >
-        {/* ===== Header ===== */}
         <div className="text-center space-y-1">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Admin Login
-          </h2>
-          <p className="text-sm text-gray-500">
-            Login to access your admin dashboard
-          </p>
+          <h2 className="text-2xl font-semibold text-gray-800">Welcome back</h2>
+          <p className="text-sm text-gray-500">Sign in to your dashboard</p>
         </div>
 
-        {/* ===== Error ===== */}
         {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-center">
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-center">
             {error}
           </div>
         )}
 
-        {/* ===== Inputs ===== */}
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Email Address
-            </label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Email Address</label>
             <input
               type="email"
-              placeholder="admin@example.com"
-              className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              autoComplete="email"
+              placeholder="you@example.com"
+              className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
-
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Password
-            </label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
             <input
               type="password"
+              autoComplete="current-password"
               placeholder="••••••••"
-              className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -82,19 +74,15 @@ export default function Login() {
           </div>
         </div>
 
-        {/* ===== Action ===== */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-green-600 text-white py-2.5 rounded-md text-sm font-medium hover:bg-green-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loading ? "Logging in..." : "Login"}
+          {loading ? "Signing in…" : "Sign In"}
         </button>
 
-        {/* ===== Footer ===== */}
-        <p className="text-xs text-center text-gray-400">
-          Authorized personnel only
-        </p>
+        <p className="text-xs text-center text-gray-400">Authorized personnel only</p>
       </form>
     </div>
   );
