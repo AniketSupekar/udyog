@@ -1,132 +1,233 @@
 // src/pages/Analytics.jsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getAnalyticsOverview } from "../services/analytics.api";
 import { getBusinessSnapshot } from "../services/dashboard.api";
-import { format, subMonths } from "date-fns";
-import { TrendingUp, IndianRupee, CheckCircle, Info } from "lucide-react";
 import { formatCurrency } from "../utils/currency.util";
+import { TrendingUp, IndianRupee, CheckCircle, Users, CreditCard, BarChart2 } from "lucide-react";
+import { format, subMonths } from "date-fns";
+
+const MONTH_OPTIONS = Array.from({ length: 12 }).map((_, i) => {
+  const d = subMonths(new Date(), i);
+  return { label: format(d, "MMMM yyyy"), value: format(d, "yyyy-MM") };
+});
 
 export default function Analytics() {
-  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [overview, setOverview] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
+  const [month, setMonth] = useState(MONTH_OPTIONS[0].value);
   const [loading, setLoading] = useState(true);
-
-  const months = Array.from({ length: 12 }).map((_, i) => {
-    const date = subMonths(new Date(), i);
-    return { label: format(date, "MMMM yyyy"), value: format(date, "yyyy-MM") };
-  });
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    getBusinessSnapshot({ month })
-      .then((res) => setSnapshot(res.data.data))
+    getAnalyticsOverview()
+      .then(setOverview)
       .catch(console.error)
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setSnapshotLoading(true);
+    getBusinessSnapshot({ month })
+      .then(res => setSnapshot(res.data.data))
+      .catch(console.error)
+      .finally(() => setSnapshotLoading(false));
   }, [month]);
 
-  const collectionRate = snapshot?.totalRevenue > 0
-    ? Math.round((snapshot.totalCollected / snapshot.totalRevenue) * 100)
-    : 0;
+  if (loading) {
+    return (
+      <div className="page">
+        {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 100, borderRadius: 16, marginBottom: 12 }} />)}
+      </div>
+    );
+  }
+
+  const thisMonth = overview?.thisMonth || {};
+  const collectionRate = thisMonth.collectionRate || 0;
 
   return (
-    <div className="space-y-6 pb-10">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-        <p className="text-sm text-gray-500 mt-1">Track your business performance</p>
+    <div className="page animate-in">
+      {/* HEADER */}
+      <div className="page-header">
+        <h1 className="page-title">Analytics</h1>
+        <p className="page-subtitle">Business performance overview</p>
       </div>
 
-      {/* Month Selector */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">Business Snapshot</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Monthly performance overview</p>
-          </div>
-          <select
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="text-sm rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            {months.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-          <MetricCard
-            icon={<CheckCircle size={22} />}
-            label="Delivered Orders"
-            value={loading ? "…" : snapshot?.deliveredOrders ?? 0}
-            color="green"
-          />
-          <MetricCard
-            icon={<IndianRupee size={22} />}
-            label="Total Revenue"
-            value={loading ? "…" : formatCurrency(snapshot?.totalRevenue ?? 0)}
-            color="blue"
-          />
-          <MetricCard
-            icon={<TrendingUp size={22} />}
-            label="Collection Rate"
-            value={loading ? "…" : `${collectionRate}%`}
-            color={collectionRate >= 80 ? "green" : collectionRate >= 50 ? "yellow" : "red"}
-          />
-        </div>
-
-        {/* Collection breakdown */}
-        {snapshot && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-xl text-sm space-y-2">
-            <div className="flex justify-between text-gray-600">
-              <span>Revenue (delivered orders)</span>
-              <span className="font-medium">{formatCurrency(snapshot.totalRevenue)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Amount Collected</span>
-              <span className="font-medium text-green-600">{formatCurrency(snapshot.totalCollected)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600 border-t pt-2">
-              <span>Outstanding</span>
-              <span className="font-medium text-red-600">
-                {formatCurrency((snapshot.totalRevenue || 0) - (snapshot.totalCollected || 0))}
-              </span>
-            </div>
-          </div>
-        )}
+      {/* THIS MONTH METRICS */}
+      <p className="section-label">This Month</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+        <MetricCard label="Revenue" value={formatCurrency(thisMonth.revenue || 0)} icon={IndianRupee} color="#1D4ED8" bg="#EFF6FF" />
+        <MetricCard label="Collected" value={formatCurrency(thisMonth.collected || 0)} icon={CheckCircle} color="#15803D" bg="#F0FDF4" />
+        <MetricCard label="Outstanding" value={formatCurrency(thisMonth.outstanding || 0)} icon={TrendingUp} color="#B91C1C" bg="#FEF2F2" />
+        <MetricCard label="Orders" value={thisMonth.orders || 0} icon={BarChart2} color="#6D28D9" bg="#F5F3FF" />
       </div>
 
-      {/* Info */}
-      <div className="rounded-2xl border bg-gray-50 p-5">
-        <div className="flex items-start gap-3">
-          <Info size={18} className="text-green-600 mt-0.5 shrink-0" />
-          <p className="text-sm text-gray-600 leading-relaxed">
-            <span className="font-medium text-gray-800">About Analytics: </span>
-            This snapshot shows delivered orders for the selected month. Use the dropdown to navigate between months.
-            More detailed analytics including revenue trends and top customers are coming soon.
+      {/* COLLECTION RATE */}
+      <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Collection Rate</p>
+          <p className="amount" style={{ fontSize: "1.25rem", fontWeight: 700, color: collectionRate >= 80 ? "#15803D" : collectionRate >= 50 ? "#B45309" : "#B91C1C" }}>
+            {collectionRate}%
           </p>
         </div>
+        <div style={{ height: 8, background: "var(--color-bg)", borderRadius: 99, overflow: "hidden" }}>
+          <div style={{
+            height: "100%",
+            width: `${Math.min(100, collectionRate)}%`,
+            background: collectionRate >= 80 ? "#16A34A" : collectionRate >= 50 ? "#D97706" : "#DC2626",
+            borderRadius: 99,
+            transition: "width 0.6s ease",
+          }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>
+          <span>Collected: {formatCurrency(thisMonth.collected || 0)}</span>
+          <span>Total: {formatCurrency(thisMonth.revenue || 0)}</span>
+        </div>
+      </div>
+
+      {/* REVENUE TREND */}
+      {overview?.revenueTrend?.length > 0 && (
+        <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
+          <p className="section-label">Revenue Trend (6 months)</p>
+          <RevenueBars data={overview.revenueTrend} />
+        </div>
+      )}
+
+      {/* TOP CLIENTS */}
+      {overview?.topClients?.length > 0 && (
+        <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+            <Users size={15} color="var(--color-accent)" />
+            <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Top Clients</p>
+          </div>
+          {overview.topClients.map((client, i) => (
+            <div key={i} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 0",
+              borderBottom: i < overview.topClients.length - 1 ? "1px solid var(--color-border)" : "none",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  background: ["#EFF6FF","#F0FDF4","#FEF3C7","#F5F3FF","#FEF2F2"][i],
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 700, fontSize: "0.8125rem",
+                  color: ["#1D4ED8","#15803D","#B45309","#6D28D9","#B91C1C"][i],
+                  flexShrink: 0,
+                }}>
+                  {i + 1}
+                </div>
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--color-text-primary)" }}>{client.name}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>{client.orders} orders</p>
+                </div>
+              </div>
+              <p className="amount" style={{ fontWeight: 700, color: "var(--color-accent)" }}>{formatCurrency(client.revenue)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* PAYMENT METHOD BREAKDOWN */}
+      {overview?.paymentBreakdown?.length > 0 && (
+        <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+            <CreditCard size={15} color="var(--color-accent)" />
+            <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Payment Methods</p>
+          </div>
+          {overview.paymentBreakdown.map((p, i) => {
+            const totalAmt = overview.paymentBreakdown.reduce((s, x) => s + x.total, 0);
+            const pct = totalAmt > 0 ? Math.round((p.total / totalAmt) * 100) : 0;
+            const colors = ["#16A34A","#2563EB","#D97706","#7C3AED","#DC2626"];
+            return (
+              <div key={i} style={{ marginBottom: i < overview.paymentBreakdown.length - 1 ? 12 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                  <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--color-text-primary)" }}>{p.method}</span>
+                  <span style={{ display: "flex", gap: 10 }}>
+                    <span className="amount" style={{ fontSize: "0.875rem", fontWeight: 500 }}>{formatCurrency(p.total)}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", minWidth: 32, textAlign: "right" }}>{pct}%</span>
+                  </span>
+                </div>
+                <div style={{ height: 6, background: "var(--color-bg)", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: colors[i % colors.length], borderRadius: 99, transition: "width 0.4s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* MONTHLY SNAPSHOT */}
+      <p className="section-label">Monthly Snapshot</p>
+      <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Delivered Orders</p>
+          <select value={month} onChange={e => setMonth(e.target.value)} className="input" style={{ width: "auto", height: 36, fontSize: "0.8125rem" }}>
+            {MONTH_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+        </div>
+        {snapshotLoading ? (
+          <div className="skeleton" style={{ height: 60, borderRadius: 12 }} />
+        ) : snapshot ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <SnapCard label="Orders" value={snapshot.deliveredOrders || 0} color="#15803D" />
+            <SnapCard label="Revenue" value={formatCurrency(snapshot.totalRevenue || 0)} color="#1D4ED8" />
+            <SnapCard label="Collected" value={formatCurrency(snapshot.totalCollected || 0)} color="#6D28D9" />
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-const colorMap = {
-  green: { bg: "bg-green-50 border-green-100", icon: "bg-green-100 text-green-700", text: "text-green-700" },
-  blue: { bg: "bg-blue-50 border-blue-100", icon: "bg-blue-100 text-blue-700", text: "text-blue-700" },
-  yellow: { bg: "bg-yellow-50 border-yellow-100", icon: "bg-yellow-100 text-yellow-700", text: "text-yellow-700" },
-  red: { bg: "bg-red-50 border-red-100", icon: "bg-red-100 text-red-700", text: "text-red-700" },
-};
-
-const MetricCard = ({ icon, label, value, color = "green" }) => {
-  const c = colorMap[color];
+/* ─── Revenue Bar Chart (pure CSS) ─────────────────────────────────── */
+function RevenueBars({ data }) {
+  const maxRevenue = Math.max(...data.map(d => d.revenue), 1);
   return (
-    <div className={`flex items-center gap-4 rounded-xl border p-4 ${c.bg}`}>
-      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${c.icon}`}>{icon}</div>
-      <div>
-        <p className="text-xs text-gray-600">{label}</p>
-        <p className={`text-xl font-bold mt-0.5 ${c.text}`}>{value}</p>
-      </div>
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120 }}>
+      {data.map((d, i) => {
+        const heightPct = Math.max(4, (d.revenue / maxRevenue) * 100);
+        const isLast = i === data.length - 1;
+        return (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <p style={{ fontSize: "0.6rem", color: isLast ? "var(--color-accent)" : "var(--color-text-tertiary)", fontFamily: "var(--font-mono)", fontWeight: isLast ? 600 : 400 }}>
+              {formatCurrency(d.revenue).replace("₹","₹")}
+            </p>
+            <div style={{
+              width: "100%",
+              height: `${heightPct}%`,
+              background: isLast ? "var(--color-accent)" : "#E5E7EB",
+              borderRadius: "4px 4px 0 0",
+              transition: "height 0.4s ease",
+              minHeight: 4,
+            }} />
+            <p style={{ fontSize: "0.625rem", color: isLast ? "var(--color-accent)" : "var(--color-text-tertiary)", fontWeight: isLast ? 600 : 400 }}>
+              {d.shortMonth}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
-};
+}
+
+function MetricCard({ label, value, icon: Icon, color, bg }) {
+  return (
+    <div style={{ background: bg, borderRadius: "var(--radius-lg)", padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <Icon size={15} color={color} />
+        <p style={{ fontSize: "0.75rem", fontWeight: 500, color }}>{label}</p>
+      </div>
+      <p className="amount" style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-text-primary)" }}>{value}</p>
+    </div>
+  );
+}
+
+function SnapCard({ label, value, color }) {
+  return (
+    <div style={{ textAlign: "center" }}>
+      <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginBottom: 4 }}>{label}</p>
+      <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color }}>{value}</p>
+    </div>
+  );
+}

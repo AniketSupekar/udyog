@@ -1,20 +1,14 @@
 // src/pages/OrderDetails.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  fetchOrderById,
-  updateOrderStatus,
-  softDeleteOrder,
-  updateOrderDetails,
-  recordPayment,
-} from "../services/order.api";
+import { fetchOrderById, updateOrderStatus, softDeleteOrder, updateOrderDetails } from "../services/order.api";
 import StatusBadge from "../components/StatusBadge";
 import BillModal from "../components/bill/BillModal";
 import RecordPaymentModal from "../components/payments/RecordPaymentModal";
 import { formatDate, toInputDate } from "../utils/date.util";
 import { formatCurrency } from "../utils/currency.util";
 import { getConfirmationUrl, getPaymentReminderUrl, getBillUrl } from "../utils/whatsapp.util";
-import { MessageCircle, Trash2, Edit2, X, Check } from "lucide-react";
+import { MessageCircle, Trash2, Edit2, X, Check, ChevronLeft, IndianRupee } from "lucide-react";
 
 const STATUS_TRANSITIONS = {
   CREATED: ["PENDING"],
@@ -26,16 +20,13 @@ const STATUS_TRANSITIONS = {
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [showBill, setShowBill] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-
-  // Hardcoded business name for now — will come from business profile later
-  const businessName = "My Business";
+  const [statusLoading, setStatusLoading] = useState(false);
 
   useEffect(() => {
     fetchOrderById(id)
@@ -45,12 +36,15 @@ export default function OrderDetails() {
   }, [id]);
 
   const handleStatusChange = async (nextStatus) => {
-    if (!window.confirm(`Mark this order as ${nextStatus}?`)) return;
+    if (!window.confirm(`Mark as ${nextStatus}?`)) return;
+    setStatusLoading(true);
     try {
       const updated = await updateOrderStatus(order._id, nextStatus);
       setOrder(updated);
     } catch (err) {
       alert(err.response?.data?.message || "Failed to update status");
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -81,279 +75,210 @@ export default function OrderDetails() {
       setOrder(updated);
       setIsEditing(false);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update order");
+      alert(err.response?.data?.message || "Failed to update");
     }
   };
 
-  const handlePaymentRecorded = (updatedOrder) => {
-    setOrder(updatedOrder);
-    setShowPaymentModal(false);
-  };
-
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading order details…</div>;
+    return (
+      <div className="page">
+        {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 120, borderRadius: 16, marginBottom: 12 }} />)}
+      </div>
+    );
   }
 
   if (!order) return null;
 
   const isEditable = !["DELIVERED", "CANCELLED"].includes(order.status) && !order.isDeleted;
   const nextStatuses = STATUS_TRANSITIONS[order.status] || [];
+  const businessName = "My Business";
 
   return (
     <>
-      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
+      <div className="page animate-in">
 
-        {/* ── HEADER ── */}
-        <div className="flex justify-between items-start">
-          <div>
-            <button onClick={() => navigate(-1)} className="text-sm text-green-600 hover:underline mb-1 block">
-              ← Back
-            </button>
-            <h2 className="text-xl font-semibold text-gray-800">Order Details</h2>
-            <p className="text-xs text-gray-400 mt-0.5">ID: {order._id}</p>
+        {/* HEADER */}
+        <div style={{ marginBottom: 20 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.875rem", color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 12 }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <h1 className="page-title">Order Details</h1>
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 3, fontFamily: "var(--font-mono)" }}>
+                #{order._id?.slice(-8).toUpperCase()}
+              </p>
+            </div>
+            <StatusBadge status={order.status} />
           </div>
-          <StatusBadge status={order.status} />
         </div>
 
-        {/* ── ACTION BAR ── */}
-        <div className="flex flex-wrap gap-2 pt-2 border-t">
+        {/* ACTION BAR */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
           {isEditable && !isEditing && (
-            <button onClick={handleEditStart} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+            <button className="btn btn-secondary btn-sm" onClick={handleEditStart}>
               <Edit2 size={14} /> Edit
             </button>
           )}
           {isEditing && (
             <>
-              <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+              <button className="btn btn-sm" style={{ background: "var(--color-accent)", color: "white" }} onClick={handleSave}>
                 <Check size={14} /> Save
               </button>
-              <button onClick={() => setIsEditing(false)} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+              <button className="btn btn-secondary btn-sm" onClick={() => setIsEditing(false)}>
                 <X size={14} /> Cancel
               </button>
             </>
           )}
-
-          {nextStatuses.map((s) => (
+          {nextStatuses.map(s => (
             <button
               key={s}
+              className="btn btn-sm"
+              disabled={statusLoading}
               onClick={() => handleStatusChange(s)}
-              className={`px-4 py-2 text-sm rounded-lg text-white transition ${s === "DELIVERED" ? "bg-green-600 hover:bg-green-700" : "bg-yellow-500 hover:bg-yellow-600"}`}
+              style={{ background: s === "DELIVERED" ? "var(--color-accent)" : "#F59E0B", color: "white" }}
             >
-              Mark as {s}
+              {statusLoading ? "…" : `Mark ${s}`}
             </button>
           ))}
-
           {order.payment?.remainingAmount > 0 && (
-            <button
-              onClick={() => setShowPaymentModal(true)}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              Record Payment
+            <button className="btn btn-sm" style={{ background: "#EFF6FF", color: "#1D4ED8", border: "1.5px solid #BFDBFE" }} onClick={() => setShowPaymentModal(true)}>
+              <IndianRupee size={14} /> Record Payment
             </button>
           )}
-
-          {!order.isDeleted && (
-            <button onClick={() => setShowBill(true)} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
-              Generate Bill
-            </button>
-          )}
-
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowBill(true)}>
+            Bill
+          </button>
           {isEditable && (
-            <button onClick={handleDelete} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition ml-auto">
+            <button className="btn btn-danger btn-sm" style={{ marginLeft: "auto" }} onClick={handleDelete}>
               <Trash2 size={14} /> Delete
             </button>
           )}
         </div>
 
-        {/* ── WHATSAPP ACTIONS ── */}
+        {/* WHATSAPP ROW */}
         {order.clientSnapshot?.phone && (
-          <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">WhatsApp</p>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={getConfirmationUrl(order, businessName)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                <MessageCircle size={13} /> Order Confirmation
-              </a>
+          <div className="card" style={{ padding: "14px 16px", marginBottom: 12, background: "#F0FDF4", border: "1.5px solid #BBF7D0" }}>
+            <p className="section-label" style={{ marginBottom: 10 }}>Send on WhatsApp</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <WhatsAppBtn label="Confirmation" url={getConfirmationUrl(order, businessName)} color="#15803D" bg="#DCFCE7" />
               {order.payment?.remainingAmount > 0 && (
-                <a
-                  href={getPaymentReminderUrl(order, businessName)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
-                >
-                  <MessageCircle size={13} /> Payment Reminder
-                </a>
+                <WhatsAppBtn label="Pay Reminder" url={getPaymentReminderUrl(order, businessName)} color="#B45309" bg="#FEF9C3" />
               )}
-              <a
-                href={getBillUrl(order, businessName)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-              >
-                <MessageCircle size={13} /> Send Bill
-              </a>
+              <WhatsAppBtn label="Bill" url={getBillUrl(order, businessName)} color="#1D4ED8" bg="#DBEAFE" />
             </div>
           </div>
         )}
 
-        {/* ── CUSTOMER INFO ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-600">Customer Information</h3>
+        {/* CUSTOMER */}
+        <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
+          <p className="section-label">Customer</p>
           {isEditing ? (
-            <div className="space-y-2">
-              <input
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="Name"
-                value={formData.clientSnapshot?.name || ""}
-                onChange={(e) => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, name: e.target.value } })}
-              />
-              <input
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="Phone"
-                value={formData.clientSnapshot?.phone || ""}
-                onChange={(e) => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, phone: e.target.value } })}
-              />
-              <input
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="Address"
-                value={formData.clientSnapshot?.address || ""}
-                onChange={(e) => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, address: e.target.value } })}
-              />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <input className="input" placeholder="Name" value={formData.clientSnapshot?.name || ""} onChange={e => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, name: e.target.value } })} />
+              <input className="input" placeholder="Phone" value={formData.clientSnapshot?.phone || ""} onChange={e => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, phone: e.target.value } })} />
+              <input className="input" placeholder="Address" value={formData.clientSnapshot?.address || ""} onChange={e => setFormData({ ...formData, clientSnapshot: { ...formData.clientSnapshot, address: e.target.value } })} />
             </div>
           ) : (
-            <>
-              <p className="font-medium text-gray-900">{order.clientSnapshot?.name}</p>
-              <p className="text-sm text-gray-600">📞 {order.clientSnapshot?.phone}</p>
-              {order.clientSnapshot?.address && (
-                <p className="text-sm text-gray-600">📍 {order.clientSnapshot?.address}</p>
-              )}
-            </>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <p style={{ fontWeight: 600, fontSize: "1rem", color: "var(--color-text-primary)" }}>{order.clientSnapshot?.name}</p>
+              <p style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>📞 {order.clientSnapshot?.phone}</p>
+              {order.clientSnapshot?.address && <p style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>📍 {order.clientSnapshot?.address}</p>}
+            </div>
           )}
         </div>
 
-        {/* ── DATES ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Dates</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+        {/* DATES */}
+        <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
+          <p className="section-label">Dates</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <p className="text-gray-500">Order Date</p>
-              {isEditing ? (
-                <input type="date" className="border rounded-lg px-3 py-2 text-sm w-full mt-1" value={formData.orderDate} onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })} />
-              ) : (
-                <p className="font-medium text-gray-900 mt-1">{formatDate(order.orderDate)}</p>
-              )}
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginBottom: 4 }}>Order Date</p>
+              {isEditing
+                ? <input type="date" className="input" value={formData.orderDate} onChange={e => setFormData({ ...formData, orderDate: e.target.value })} />
+                : <p style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{formatDate(order.orderDate)}</p>
+              }
             </div>
             <div>
-              <p className="text-gray-500">Delivery Date</p>
-              {isEditing ? (
-                <input type="date" className="border rounded-lg px-3 py-2 text-sm w-full mt-1" value={formData.deliveryDate} onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })} />
-              ) : (
-                <p className="font-medium text-gray-900 mt-1">{formatDate(order.deliveryDate)}</p>
-              )}
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginBottom: 4 }}>Delivery Date</p>
+              {isEditing
+                ? <input type="date" className="input" value={formData.deliveryDate} onChange={e => setFormData({ ...formData, deliveryDate: e.target.value })} />
+                : <p style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{formatDate(order.deliveryDate)}</p>
+              }
             </div>
           </div>
         </div>
 
-        {/* ── ORDER ITEMS ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Order Items</h3>
-          <div className="space-y-2">
+        {/* ITEMS */}
+        <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
+          <p className="section-label">Order Items</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {order.items?.map((item, i) => (
-              <div key={i} className="flex justify-between items-center py-2 border-b last:border-0">
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.items.length - 1 ? "1px solid var(--color-border)" : "none" }}>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{item.productName}</p>
-                  <p className="text-xs text-gray-500">{item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}</p>
+                  <p style={{ fontWeight: 500, fontSize: "0.9375rem", color: "var(--color-text-primary)" }}>{item.productName}</p>
+                  <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>
+                    {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
+                  </p>
                 </div>
-                <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.amount)}</p>
+                <p className="amount" style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{formatCurrency(item.amount)}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── PAYMENT SUMMARY ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-600">Payment Summary</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-gray-600">
-              <span>Subtotal</span>
-              <span>{formatCurrency(order.financial?.subtotal)}</span>
-            </div>
-            {order.financial?.discountAmount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Discount</span>
-                <span>-{formatCurrency(order.financial?.discountAmount)}</span>
-              </div>
-            )}
-            {order.financial?.taxAmount > 0 && (
-              <div className="flex justify-between text-gray-600">
-                <span>Tax ({order.financial?.taxRate}%)</span>
-                <span>{formatCurrency(order.financial?.taxAmount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-semibold text-gray-900 border-t pt-2 text-base">
-              <span>Total</span>
-              <span>{formatCurrency(order.financial?.total)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Total Paid</span>
-              <span className="text-green-600">{formatCurrency(order.payment?.totalPaid)}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-red-600 text-base">
-              <span>Balance Due</span>
-              <span>{formatCurrency(order.payment?.remainingAmount)}</span>
-            </div>
+        {/* PAYMENT SUMMARY */}
+        <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
+          <p className="section-label">Payment</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <PayRow label="Subtotal" value={formatCurrency(order.financial?.subtotal)} />
+            {order.financial?.discountAmount > 0 && <PayRow label="Discount" value={`-${formatCurrency(order.financial.discountAmount)}`} valueColor="var(--color-accent)" />}
+            {order.financial?.taxAmount > 0 && <PayRow label={`Tax (${order.financial.taxRate}%)`} value={formatCurrency(order.financial.taxAmount)} />}
+            <div style={{ height: 1, background: "var(--color-border)" }} />
+            <PayRow label="Total" value={formatCurrency(order.financial?.total)} bold />
+            <PayRow label="Amount Paid" value={formatCurrency(order.payment?.totalPaid)} valueColor="var(--color-accent)" />
+            <div style={{ height: 1, background: "var(--color-border)" }} />
+            <PayRow
+              label="Balance Due"
+              value={formatCurrency(order.payment?.remainingAmount)}
+              valueColor={order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-accent)"}
+              bold
+            />
           </div>
-
-          {/* Payment Status Badge */}
-          <div className="pt-2 border-t">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-              order.payment?.status === "PAID" ? "bg-green-100 text-green-700" :
-              order.payment?.status === "PARTIAL" ? "bg-yellow-100 text-yellow-700" :
-              "bg-red-100 text-red-700"
-            }`}>
-              {order.payment?.status}
-            </span>
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <StatusBadge status={order.payment?.status} />
           </div>
         </div>
 
-        {/* ── PAYMENT HISTORY ── */}
+        {/* PAYMENT HISTORY */}
         {order.payment?.transactions?.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-semibold text-gray-600 mb-3">Payment History</h3>
-            <div className="space-y-2">
-              {order.payment.transactions.map((txn, i) => (
-                <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
-                  <div>
-                    <p className="font-medium text-gray-900">{formatCurrency(txn.amount)}</p>
-                    <p className="text-xs text-gray-500">{txn.method} · {formatDate(txn.recordedAt)}</p>
-                    {txn.note && <p className="text-xs text-gray-400">{txn.note}</p>}
-                  </div>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{txn.method}</span>
+          <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
+            <p className="section-label">Payment History</p>
+            {order.payment.transactions.map((txn, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.payment.transactions.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+                <div>
+                  <p style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--color-text-primary)" }}>{txn.method}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                    {formatDate(txn.recordedAt)}{txn.note ? ` · ${txn.note}` : ""}
+                  </p>
                 </div>
-              ))}
-            </div>
+                <p className="amount" style={{ fontWeight: 600, color: "var(--color-accent)" }}>{formatCurrency(txn.amount)}</p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* ── NOTES ── */}
+        {/* NOTES */}
         {(order.notes || isEditing) && (
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-semibold text-gray-600 mb-2">Notes</h3>
-            {isEditing ? (
-              <textarea
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                rows={3}
-                value={formData.notes || ""}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Add order notes..."
-              />
-            ) : (
-              <p className="text-sm text-gray-700">{order.notes}</p>
-            )}
+          <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
+            <p className="section-label">Notes</p>
+            {isEditing
+              ? <textarea className="input" rows={3} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Add notes..." />
+              : <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)" }}>{order.notes}</p>
+            }
           </div>
         )}
       </div>
@@ -363,9 +288,33 @@ export default function OrderDetails() {
         <RecordPaymentModal
           order={order}
           onClose={() => setShowPaymentModal(false)}
-          onSuccess={handlePaymentRecorded}
+          onSuccess={(updated) => { setOrder(updated); setShowPaymentModal(false); }}
         />
       )}
     </>
+  );
+}
+
+function WhatsAppBtn({ label, url, color, bg }) {
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="btn btn-sm"
+      style={{ background: bg, color, border: `1.5px solid ${color}33`, textDecoration: "none" }}
+    >
+      <MessageCircle size={13} /> {label}
+    </a>
+  );
+}
+
+function PayRow({ label, value, valueColor, bold }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>{label}</span>
+      <span className="amount" style={{ fontSize: bold ? "1rem" : "0.9375rem", fontWeight: bold ? 700 : 500, color: valueColor || "var(--color-text-primary)" }}>{value}</span>
+    </div>
   );
 }

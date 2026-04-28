@@ -1,79 +1,70 @@
 // src/components/OrderForm.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createOrder } from "../services/order.api";
+import { getProducts } from "../services/product.api";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Package, ChevronDown } from "lucide-react";
 import { formatCurrency } from "../utils/currency.util";
 
+const UNITS = ["piece","kg","gram","liter","ml","box","bundle","bag","set","unit"];
 const DEFAULT_ITEM = { productName: "", quantity: "", unitPrice: "", unit: "piece" };
 
 export default function OrderForm() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  const [products, setProducts] = useState([]);
+  const [showCatalog, setShowCatalog] = useState(false);
   const [clientSnapshot, setClientSnapshot] = useState({ name: "", phone: "", address: "" });
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0]);
+  const [orderDate] = useState(new Date().toISOString().split("T")[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [items, setItems] = useState([{ ...DEFAULT_ITEM }]);
   const [advancePaid, setAdvancePaid] = useState("");
   const [notes, setNotes] = useState("");
 
-  // ── Item helpers ─────────────────────────────────────────────────────────────
+  useEffect(() => { getProducts().then(setProducts).catch(() => {}); }, []);
+
+  const addFromCatalog = (product) => {
+    const exists = items.findIndex(i => i.productName === product.name);
+    if (exists >= 0) {
+      const updated = [...items];
+      updated[exists].quantity = String((parseFloat(updated[exists].quantity) || 0) + 1);
+      setItems(updated);
+    } else {
+      const emptyIdx = items.findIndex(i => !i.productName.trim());
+      const newItem = { productName: product.name, quantity: "1", unitPrice: String(product.basePrice), unit: product.unit };
+      if (emptyIdx >= 0) { const u = [...items]; u[emptyIdx] = newItem; setItems(u); }
+      else setItems([...items, newItem]);
+    }
+    setShowCatalog(false);
+  };
+
   const updateItem = (index, field, value) => {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
     setItems(updated);
   };
 
-  const addItem = () => setItems([...items, { ...DEFAULT_ITEM }]);
-
-  const removeItem = (index) => {
-    if (items.length === 1) return;
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  // ── Computed totals ───────────────────────────────────────────────────────────
-  const subtotal = items.reduce((sum, item) => {
-    const qty = parseFloat(item.quantity) || 0;
-    const price = parseFloat(item.unitPrice) || 0;
-    return sum + qty * price;
-  }, 0);
-
+  const subtotal = items.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
   const remaining = subtotal - (parseFloat(advancePaid) || 0);
 
-  // ── Submit ────────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
-    // Validate items
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.productName.trim()) { setError(`Item ${i + 1}: product name is required`); return; }
-      if (!item.quantity || parseFloat(item.quantity) <= 0) { setError(`Item ${i + 1}: quantity must be greater than 0`); return; }
-      if (item.unitPrice === "" || parseFloat(item.unitPrice) < 0) { setError(`Item ${i + 1}: price is required`); return; }
+      if (!items[i].productName.trim()) { setError(`Item ${i+1}: product name required`); return; }
+      if (!items[i].quantity || parseFloat(items[i].quantity) <= 0) { setError(`Item ${i+1}: quantity must be > 0`); return; }
+      if (items[i].unitPrice === "" || parseFloat(items[i].unitPrice) < 0) { setError(`Item ${i+1}: price required`); return; }
     }
-
-    if (remaining < 0) { setError("Advance paid cannot exceed total amount"); return; }
-
-    const payload = {
-      clientSnapshot,
-      orderDate,
-      deliveryDate,
-      items: items.map((item) => ({
-        productName: item.productName.trim(),
-        quantity: parseFloat(item.quantity),
-        unitPrice: parseFloat(item.unitPrice),
-        unit: item.unit || "piece",
-      })),
-      advancePaid: parseFloat(advancePaid) || 0,
-      notes: notes.trim() || undefined,
-    };
-
+    if (remaining < 0) { setError("Advance cannot exceed total"); return; }
     setLoading(true);
     try {
-      await createOrder(payload);
+      await createOrder({
+        clientSnapshot, orderDate, deliveryDate,
+        items: items.map(i => ({ productName: i.productName.trim(), quantity: parseFloat(i.quantity), unitPrice: parseFloat(i.unitPrice), unit: i.unit || "piece" })),
+        advancePaid: parseFloat(advancePaid) || 0,
+        notes: notes.trim() || undefined,
+      });
       navigate("/orders");
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create order");
@@ -83,186 +74,140 @@ export default function OrderForm() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-800">Create Order</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Fill in customer details and order items</p>
+    <div className="page animate-in">
+      <div className="page-header">
+        <button onClick={() => navigate(-1)} style={{ fontSize: "0.875rem", color: "var(--color-accent)", marginBottom: 8, display: "block", background: "none", border: "none", cursor: "pointer", padding: 0 }}>← Back</button>
+        <h1 className="page-title">Create Order</h1>
+        <p className="page-subtitle">Fill in the details below</p>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {error && (
+          <div style={{ background: "var(--color-danger-light)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", padding: "12px 16px", fontSize: "0.875rem", fontWeight: 500 }}>
+            {error}
+          </div>
+        )}
+
+        {/* CUSTOMER */}
+        <div className="card" style={{ padding: "16px" }}>
+          <p className="section-label">Customer Details</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input className="input" placeholder="Customer Name *" required value={clientSnapshot.name} onChange={e => setClientSnapshot({ ...clientSnapshot, name: e.target.value })} />
+            <input className="input" placeholder="Phone Number *" required value={clientSnapshot.phone} onChange={e => setClientSnapshot({ ...clientSnapshot, phone: e.target.value })} />
+            <input className="input" placeholder="Address (optional)" value={clientSnapshot.address} onChange={e => setClientSnapshot({ ...clientSnapshot, address: e.target.value })} />
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8">
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-              {error}
+        {/* DATES */}
+        <div className="card" style={{ padding: "16px" }}>
+          <p className="section-label">Dates</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-secondary)", marginBottom: 6 }}>Order Date</p>
+              <input type="date" className="input" value={orderDate} readOnly style={{ background: "var(--color-bg)" }} />
+            </div>
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-secondary)", marginBottom: 6 }}>Delivery Date *</p>
+              <input type="date" className="input" required value={deliveryDate} min={orderDate} onChange={e => setDeliveryDate(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* ITEMS */}
+        <div className="card" style={{ padding: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <p className="section-label" style={{ marginBottom: 0 }}>Order Items</p>
+            {products.length > 0 && (
+              <button type="button" className="btn btn-sm" onClick={() => setShowCatalog(!showCatalog)}
+                style={{ background: "#F0FDF4", color: "#15803D", border: "1.5px solid #BBF7D0", gap: 5 }}>
+                <Package size={13} /> Catalog <ChevronDown size={12} />
+              </button>
+            )}
+          </div>
+
+          {showCatalog && (
+            <div className="animate-in" style={{ background: "var(--color-bg)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", marginBottom: 12, overflow: "hidden" }}>
+              {products.map(p => (
+                <button key={p._id} type="button" onClick={() => addFromCatalog(p)}
+                  style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderBottom: "1px solid var(--color-border)", background: "none", cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--color-surface)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                  <span style={{ fontWeight: 500, fontSize: "0.9rem" }}>{p.name}</span>
+                  <span className="amount" style={{ fontSize: "0.875rem", color: "var(--color-accent)" }}>{formatCurrency(p.basePrice)}/{p.unit}</span>
+                </button>
+              ))}
             </div>
           )}
 
-          {/* ── CUSTOMER ── */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                placeholder="Customer Name *"
-                required
-                className="input"
-                value={clientSnapshot.name}
-                onChange={(e) => setClientSnapshot({ ...clientSnapshot, name: e.target.value })}
-              />
-              <input
-                placeholder="Phone Number *"
-                required
-                className="input"
-                value={clientSnapshot.phone}
-                onChange={(e) => setClientSnapshot({ ...clientSnapshot, phone: e.target.value })}
-              />
-            </div>
-            <input
-              placeholder="Address"
-              className="input w-full"
-              value={clientSnapshot.address}
-              onChange={(e) => setClientSnapshot({ ...clientSnapshot, address: e.target.value })}
-            />
-          </section>
-
-          {/* ── DATES ── */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dates</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Order Date</label>
-                <input type="date" required className="input w-full" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Delivery Date</label>
-                <input type="date" required className="input w-full" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
-              </div>
-            </div>
-          </section>
-
-          {/* ── ITEMS ── */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Items</h3>
-            <div className="space-y-3">
-              {items.map((item, index) => (
-                <div key={index} className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
-                  <input
-                    placeholder="Product Name *"
-                    required
-                    className="input w-full"
-                    value={item.productName}
-                    onChange={(e) => updateItem(index, "productName", e.target.value)}
-                  />
-                  <div className="grid grid-cols-3 gap-3">
-                    <input
-                      type="number"
-                      placeholder="Qty *"
-                      required
-                      min="0.01"
-                      step="0.01"
-                      className="input"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, "quantity", e.target.value)}
-                    />
-                    <select
-                      className="input"
-                      value={item.unit}
-                      onChange={(e) => updateItem(index, "unit", e.target.value)}
-                    >
-                      {["piece", "kg", "liter", "box", "bundle", "set"].map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Price ₹ *"
-                      required
-                      min="0"
-                      step="0.01"
-                      className="input"
-                      value={item.unitPrice}
-                      onChange={(e) => updateItem(index, "unitPrice", e.target.value)}
-                    />
-                  </div>
-                  {item.quantity && item.unitPrice && (
-                    <p className="text-xs text-right text-gray-500">
-                      = {formatCurrency(parseFloat(item.quantity) * parseFloat(item.unitPrice))}
-                    </p>
-                  )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {items.map((item, index) => (
+              <div key={index} style={{ border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "12px", background: "var(--color-bg)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <input className="input" placeholder="Product name *" value={item.productName} onChange={e => updateItem(index, "productName", e.target.value)} required />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <input className="input" type="number" placeholder="Qty" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(index, "quantity", e.target.value)} required />
+                  <select className="input" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)}>
+                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <input className="input" type="number" placeholder="₹ Price" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(index, "unitPrice", e.target.value)} required />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {item.quantity && item.unitPrice
+                    ? <span className="amount" style={{ fontSize: "0.875rem", color: "var(--color-accent)", fontWeight: 600 }}>= {formatCurrency(parseFloat(item.quantity) * parseFloat(item.unitPrice))}</span>
+                    : <span />}
                   {items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(index)} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 transition">
-                      <Trash2 size={13} /> Remove item
+                    <button type="button" onClick={() => setItems(items.filter((_, i) => i !== index))}
+                      style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.8rem", color: "var(--color-danger)", background: "none", border: "none", cursor: "pointer" }}>
+                      <Trash2 size={13} /> Remove
                     </button>
                   )}
                 </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addItem}
-              className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition flex items-center justify-center gap-2"
-            >
-              <Plus size={16} /> Add Item
-            </button>
-          </section>
-
-          {/* ── PAYMENT ── */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment</h3>
-            <input
-              type="number"
-              placeholder="Advance Paid (₹)"
-              min="0"
-              step="0.01"
-              className="input w-full"
-              value={advancePaid}
-              onChange={(e) => setAdvancePaid(e.target.value)}
-            />
-
-            {/* Summary */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-              <div className="flex justify-between text-gray-600">
-                <span>Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span>Advance Paid</span>
-                <span className="text-green-600">{formatCurrency(parseFloat(advancePaid) || 0)}</span>
-              </div>
-              <div className="flex justify-between font-semibold text-gray-900 border-t pt-2">
-                <span>Balance Due</span>
-                <span className={remaining < 0 ? "text-red-600" : "text-gray-900"}>{formatCurrency(Math.max(0, remaining))}</span>
-              </div>
-            </div>
-          </section>
-
-          {/* ── NOTES ── */}
-          <section>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notes (optional)</h3>
-            <textarea
-              rows={2}
-              placeholder="Any special instructions..."
-              className="input w-full resize-none"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </section>
-
-          {/* ── FOOTER ── */}
-          <div className="flex justify-end gap-3 pt-2 border-t">
-            <button type="button" onClick={() => navigate(-1)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 transition"
-            >
-              {loading ? "Creating…" : "Create Order"}
-            </button>
+            ))}
           </div>
-        </form>
-      </div>
+
+          <button type="button" onClick={() => setItems([...items, { ...DEFAULT_ITEM }])}
+            style={{ width: "100%", marginTop: 10, padding: "11px", border: "2px dashed var(--color-border)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: "0.875rem", color: "var(--color-text-secondary)", background: "none", cursor: "pointer" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-accent)"; e.currentTarget.style.color = "var(--color-accent)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--color-text-secondary)"; }}>
+            <Plus size={15} /> Add Item
+          </button>
+        </div>
+
+        {/* PAYMENT */}
+        <div className="card" style={{ padding: "16px" }}>
+          <p className="section-label">Payment</p>
+          <input className="input" type="number" placeholder="Advance Paid (₹)" min="0" step="0.01" value={advancePaid} onChange={e => setAdvancePaid(e.target.value)} style={{ marginBottom: 12 }} />
+          <div style={{ background: "var(--color-bg)", borderRadius: "var(--radius-md)", padding: "12px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>Subtotal</span>
+              <span className="amount" style={{ fontSize: "0.9375rem" }}>{formatCurrency(subtotal)}</span>
+            </div>
+            {advancePaid && (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>Advance</span>
+                <span className="amount" style={{ fontSize: "0.9375rem", color: "var(--color-accent)" }}>-{formatCurrency(parseFloat(advancePaid) || 0)}</span>
+              </div>
+            )}
+            <div style={{ height: 1, background: "var(--color-border)" }} />
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--color-text-primary)" }}>Balance Due</span>
+              <span className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: remaining < 0 ? "var(--color-danger)" : "var(--color-text-primary)" }}>{formatCurrency(Math.max(0, remaining))}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* NOTES */}
+        <div className="card" style={{ padding: "16px" }}>
+          <p className="section-label">Notes (optional)</p>
+          <textarea className="input" rows={2} placeholder="Special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
+        </div>
+
+        {/* SUBMIT */}
+        <div style={{ display: "flex", gap: 10, paddingBottom: 8 }}>
+          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate(-1)}>Cancel</button>
+          <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={loading}>{loading ? "Creating…" : "Create Order"}</button>
+        </div>
+      </form>
     </div>
   );
 }

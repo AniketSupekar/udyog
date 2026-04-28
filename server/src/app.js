@@ -3,7 +3,7 @@
 // Zero business logic here
 // Order of middleware matters — do not reorder
 
-import "./config/env.js";
+import "./config/env.js"; // Loads .env AND validates required vars — must be first
 import { env } from "./config/env.js";
 
 import express from "express";
@@ -19,6 +19,8 @@ import orderRoutes from "./modules/orders/order.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import businessRoutes from "./modules/business/business.routes.js";
+import paymentRoutes from "./modules/payments/payment.routes.js";
+import productRoutes from "./modules/products/product.routes.js";
 
 // Middleware
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
@@ -81,6 +83,8 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/business", businessRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/products", productRoutes);
 
 // ─── Cron endpoint (secured with cronLimiter) ─────────────────────────────────
 // Called by external scheduler (Vercel cron / uptime robot)
