@@ -1,33 +1,23 @@
-export default function StatusBadge({ status }) {
-  const STATUS_MAP = {
-    CREATED: {
-      label: "Created",
-      classes: "bg-blue-100 text-blue-700",
-    },
-    PENDING: {
-      label: "Pending",
-      classes: "bg-yellow-100 text-yellow-700",
-    },
-    DELIVERED: {
-      label: "Delivered",
-      classes: "bg-green-100 text-green-700",
-    },
-    CANCELLED: {
-      label: "Cancelled",
-      classes: "bg-red-100 text-red-700",
-    },
-  };
+// src/components/StatusBadge.jsx
+const CONFIG = {
+  CREATED:   { label: "Created",   bg: "#EFF6FF", color: "#1D4ED8" },
+  PENDING:   { label: "Pending",   bg: "#FFFBEB", color: "#B45309" },
+  DELIVERED: { label: "Delivered", bg: "#F0FDF4", color: "#15803D" },
+  CANCELLED: { label: "Cancelled", bg: "#FEF2F2", color: "#B91C1C" },
+  UNPAID:    { label: "Unpaid",    bg: "#FEF2F2", color: "#B91C1C" },
+  PARTIAL:   { label: "Partial",   bg: "#FFFBEB", color: "#B45309" },
+  PAID:      { label: "Paid",      bg: "#F0FDF4", color: "#15803D" },
+};
 
-  const current = STATUS_MAP[status] || {
-    label: status,
-    classes: "bg-gray-100 text-gray-700",
-  };
+export default function StatusBadge({ status }) {
+  const cfg = CONFIG[status] || { label: status, bg: "#F3F4F6", color: "#4B5563" };
 
   return (
     <span
-      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${current.classes}`}
+      className="badge"
+      style={{ background: cfg.bg, color: cfg.color }}
     >
-      {current.label}
+      {cfg.label}
     </span>
   );
 }

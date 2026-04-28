@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { Plus, ChevronDown, LogOut } from "lucide-react";
+// src/components/Header.jsx
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import NotificationBell from "./notifications/NotificationBell";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "./notifications/NotificationBell";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -10,83 +11,94 @@ export default function Header() {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
-  // Close dropdown if clicked outside
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setShowMenu(false);
-      }
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const handleLogout = async () => {
-    const confirmed = window.confirm("Are you sure you want to logout?");
-    if (!confirmed) return;
-
-    try {
-      await logout();
-      alert("You have been logged out successfully!");
-    } catch (err) {
-      console.error("Logout failed:", err);
-      alert("Logout failed! Please try again.");
-    }
+    if (!window.confirm("Sign out?")) return;
+    await logout();
   };
 
   return (
-    <header className="flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-sm">
-      {/* Left */}
+    <header style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "14px 0",
+      marginBottom: 8,
+    }}>
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">
-          Nursery Orders
-        </h1>
-        <p className="text-xs text-gray-500">
-          Manage daily orders & deliveries
+        <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>
+          Order Management
         </p>
+        <h1 style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>
+          Dashboard
+        </h1>
       </div>
-
-      {/* Right */}
-      <div className="flex items-center gap-3">
-        {/* Create Order */}
-        {/* <button
-          onClick={() => navigate("/create")}
-          className="flex items-center gap-1.5 rounded-full bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 transition"
-        >
-          <Plus size={16} />
-          Create
-        </button> */}
-
-        {/* Notifications */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <NotificationBell />
-
-        {/* User Menu */}
         {user && (
-          <div ref={menuRef} className="relative">
+          <div ref={menuRef} style={{ position: "relative" }}>
             <button
-              onClick={() => setShowMenu((prev) => !prev)}
-              className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition"
+              onClick={() => setShowMenu(p => !p)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                height: 40,
+                padding: "0 12px",
+                background: "var(--color-surface)",
+                border: "1.5px solid var(--color-border)",
+                borderRadius: "var(--radius-full)",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-xs font-semibold text-white">
+              <div style={{
+                width: 26, height: 26,
+                background: "var(--color-accent)",
+                borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "0.75rem", fontWeight: 700, color: "white",
+              }}>
                 {user.name?.[0]?.toUpperCase() || "A"}
               </div>
-              <span className="hidden sm:block">{user.name}</span>
-              <ChevronDown
-                size={14}
-                className={`transition-transform ${
-                  showMenu ? "rotate-180" : ""
-                }`}
-              />
+              <ChevronDown size={14} color="var(--color-text-secondary)" style={{ transform: showMenu ? "rotate(180deg)" : "", transition: "transform 0.15s" }} />
             </button>
-
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border bg-white shadow-lg z-50">
+              <div
+                className="animate-in"
+                style={{
+                  position: "absolute", right: 0, top: "calc(100% + 6px)",
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-lg)",
+                  boxShadow: "var(--shadow-lg)",
+                  minWidth: 160,
+                  overflow: "hidden",
+                  zIndex: 100,
+                }}
+              >
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)" }}>
+                  <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{user.name}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>{user.email}</p>
+                </div>
+                <button
+                  onClick={() => { navigate("/settings"); setShowMenu(false); }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "none", border: "none", cursor: "pointer", fontSize: "0.875rem", color: "var(--color-text-primary)" }}
+                >
+                  <Settings size={15} /> Settings
+                </button>
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition"
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "none", border: "none", cursor: "pointer", fontSize: "0.875rem", color: "var(--color-danger)" }}
                 >
-                  <LogOut size={16} />
-                  Logout
+                  <LogOut size={15} /> Sign Out
                 </button>
               </div>
             )}
