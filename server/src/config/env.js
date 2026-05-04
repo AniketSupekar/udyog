@@ -1,6 +1,6 @@
 // src/config/env.js
 import dotenv from "dotenv";
-dotenv.config(); // MUST be before any process.env read
+dotenv.config();
 
 const required = [
   "MONGO_URI",
@@ -11,12 +11,13 @@ const required = [
 ];
 
 const missing = required.filter((key) => !process.env[key]);
-
 if (missing.length > 0) {
   console.error("❌ Missing required environment variables:");
   missing.forEach((key) => console.error(`   - ${key}`));
   process.exit(1);
 }
+
+const isProd = process.env.NODE_ENV === "production";
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
@@ -27,6 +28,8 @@ export const env = {
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN,
   REDIS_LOCAL_URL: process.env.REDIS_LOCAL_URL,
   REDIS_PROD_URL: process.env.REDIS_PROD_URL,
-  isProd: process.env.NODE_ENV === "production",
-  isDev: process.env.NODE_ENV !== "production",
+  RESEND_API_KEY: process.env.RESEND_API_KEY || "",
+  APP_URL: process.env.APP_URL || "http://localhost:5173",
+  isProd,
+  isDev: !isProd,
 };
