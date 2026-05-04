@@ -1,89 +1,143 @@
 // src/pages/Login.jsx
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { login } from "../services/auth.api";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useToast } from "../context/ToastContext";
+import { Mail, Lock, Eye, EyeOff, Building2 } from "lucide-react";
 
 export default function Login() {
   const { setUser } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
-
     try {
       const res = await login({ email, password });
-      // API returns { success, message, data: { id, name, email, businessId, role } }
-      setUser(res.data.data);
-      navigate("/dashboard");
+      const user = res.data.data;
+      setUser(user);
+      if (!user.onboardingCompleted) {
+        navigate("/onboarding");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please try again.");
+      toast.error(err.response?.data?.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md bg-white rounded-2xl shadow-lg px-8 py-10 space-y-6"
-      >
-        <div className="text-center space-y-1">
-          <h2 className="text-2xl font-semibold text-gray-800">Welcome back</h2>
-          <p className="text-sm text-gray-500">Sign in to your dashboard</p>
+    <div style={{
+      minHeight: "100dvh",
+      background: "var(--color-bg)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "24px 16px",
+    }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+
+        {/* Brand */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{
+            width: 48, height: 48,
+            background: "var(--color-accent)",
+            borderRadius: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 16px",
+          }}>
+            <Building2 size={24} color="white" />
+          </div>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.03em" }}>
+            Welcome back
+          </h1>
+          <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginTop: 6 }}>
+            Sign in to your account
+          </p>
         </div>
 
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-center">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Email Address</label>
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            background: "var(--color-surface)",
+            borderRadius: "var(--radius-xl)",
+            border: "1px solid var(--color-border)",
+            padding: "28px 24px",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: 6 }}>
+              <Mail size={14} /> Email Address
+            </label>
             <input
+              className="input"
               type="email"
               autoComplete="email"
               placeholder="you@example.com"
-              className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               required
+              autoFocus
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                <Lock size={14} /> Password
+              </label>
+              <Link to="/forgot-password" style={{ fontSize: "0.8125rem", color: "var(--color-accent)", textDecoration: "none", fontWeight: 500 }}>
+                Forgot?
+              </Link>
+            </div>
+            <div style={{ position: "relative" }}>
+              <input
+                className="input"
+                type={showPass ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                style={{ paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(p => !p)}
+                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)" }}
+              >
+                {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {loading ? "Signing in…" : "Sign In"}
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: "100%", marginTop: 20 }}
+          >
+            {loading ? "Signing in…" : "Sign In"}
+          </button>
+        </form>
 
-        <p className="text-xs text-center text-gray-400">Authorized personnel only</p>
-      </form>
+        <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--color-text-secondary)", marginTop: 20 }}>
+          Don't have an account?{" "}
+          <Link to="/register" style={{ color: "var(--color-accent)", fontWeight: 600, textDecoration: "none" }}>
+            Create one free
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
