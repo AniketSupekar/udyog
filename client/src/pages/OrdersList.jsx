@@ -174,7 +174,7 @@ export default function OrdersList() {
                     </div>
                     <div>
                       <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Balance</p>
-                      <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 600, color: order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-accent)" }}>
+                      <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 600, color: order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
                         {formatCurrency(order.payment?.remainingAmount)}
                       </p>
                     </div>
@@ -193,19 +193,28 @@ export default function OrdersList() {
         </>
       )}
 
-      {/* FAB */}
+      {/* FAB — positioned at natural right thumb zone */}
       {!isDashboardView && (
-        <Link to="/orders/create" style={{
-          position: "fixed", bottom: 80, right: 20,
-          width: 56, height: 56,
-          background: "var(--color-accent)",
-          borderRadius: "var(--radius-full)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 4px 16px rgba(22,163,74,0.4)",
-          textDecoration: "none",
-          zIndex: 40,
-        }}>
-          <Plus size={24} color="white" />
+        <Link
+          to="/orders/create"
+          aria-label="Create new order"
+          style={{
+            position: "fixed",
+            bottom: "calc(64px + env(safe-area-inset-bottom, 0px) + 8px)",
+            right: 24,
+            width: 52,
+            height: 52,
+            background: "var(--color-cta)",
+            borderRadius: "var(--radius-full)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+            textDecoration: "none",
+            zIndex: 40,
+          }}
+        >
+          <Plus size={22} color="white" />
         </Link>
       )}
     </div>

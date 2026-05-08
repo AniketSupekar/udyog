@@ -7,7 +7,7 @@ import { env } from "./env.js";
 
 const resend = new Resend(env.RESEND_API_KEY);
 
-const FROM = "noreply@yourdomain.com"; // Change to your verified domain in Resend
+const FROM = "onboarding@resend.dev";
 
 /**
  * Send email verification OTP

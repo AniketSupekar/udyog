@@ -1,9 +1,8 @@
-// src/pages/ResetPassword.jsx
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { resetPassword } from "../services/auth.api";
 import { useToast } from "../context/ToastContext";
-import { Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -14,15 +13,24 @@ export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
   if (!token) {
     return (
-      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ textAlign: "center" }}>
-          <p style={{ color: "var(--color-danger)", fontWeight: 600 }}>Invalid or expired reset link.</p>
-          <Link to="/forgot-password" style={{ color: "var(--color-accent)", marginTop: 12, display: "block" }}>Request a new one</Link>
+      <div className="auth-screen">
+        <div className="auth-card animate-in" style={{ textAlign: "center" }}>
+          <div style={{ width: 44, height: 44, background: "var(--color-danger-light)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 6 }}>Invalid link</h2>
+          <p style={{ fontSize: "0.8125rem", color: "var(--color-text-tertiary)", marginBottom: 20 }}>This reset link is invalid or has expired.</p>
+          <Link to="/forgot-password" className="btn btn-primary" style={{ textDecoration: "none" }}>
+            Request a new link →
+          </Link>
         </div>
       </div>
     );
@@ -45,47 +53,89 @@ export default function ResetPassword() {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <div className="auth-screen">
+      <div className="auth-card animate-in">
+
+        {!done && (
+          <Link
+            to="/login"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--color-text-tertiary)", fontSize: "0.8125rem", textDecoration: "none", marginBottom: 24 }}
+          >
+            <ArrowLeft size={14} /> Back to login
+          </Link>
+        )}
+
         {done ? (
-          <div style={{ textAlign: "center", background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", padding: "40px 24px" }}>
-            <div style={{ width: 56, height: 56, background: "#F0FDF4", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <CheckCircle size={26} color="var(--color-accent)" />
+          <div style={{ textAlign: "center", paddingTop: 8 }}>
+            <div style={{ width: 44, height: 44, background: "var(--color-accent-light)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
             </div>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-text-primary)" }}>Password reset!</h2>
-            <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginTop: 8 }}>Redirecting to login…</p>
+            <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-text-primary)", letterSpacing: "-0.02em", marginBottom: 6 }}>
+              Password updated
+            </h2>
+            <p style={{ fontSize: "0.8125rem", color: "var(--color-text-tertiary)" }}>
+              Redirecting you to login…
+            </p>
           </div>
         ) : (
           <>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.03em", marginBottom: 8 }}>Set new password</h1>
-            <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginBottom: 28 }}>Choose a strong password for your account.</p>
-            <form onSubmit={handleSubmit} style={{ background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", padding: "28px 24px", boxShadow: "var(--shadow-sm)" }}>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Lock size={14} /> New Password
-                </label>
+            <h1 className="auth-heading">Set new password</h1>
+            <p className="auth-sub">Choose a strong password for your account.</p>
+
+            <form onSubmit={handleSubmit}>
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="password">New password</label>
                 <div style={{ position: "relative" }}>
                   <input
+                    id="password"
                     className="input"
                     type={showPass ? "text" : "password"}
                     placeholder="Min. 8 characters"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={e => setPassword(e.target.value)}
                     required
                     autoFocus
-                    style={{ paddingRight: 44 }}
+                    style={{ paddingRight: 40 }}
                   />
-                  <button type="button" onClick={() => setShowPass(p => !p)} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)" }}>
-                    {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(p => !p)}
+                    aria-label={showPass ? "Hide password" : "Show password"}
+                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-placeholder)", display: "flex", alignItems: "center", padding: 0 }}
+                  >
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Confirm Password</label>
-                <input className="input" type="password" placeholder="Repeat password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="confirm">Confirm password</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    id="confirm"
+                    className="input"
+                    type={showConfirm ? "text" : "password"}
+                    placeholder="Repeat password"
+                    value={confirm}
+                    onChange={e => setConfirm(e.target.value)}
+                    required
+                    style={{ paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(p => !p)}
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-placeholder)", display: "flex", alignItems: "center", padding: 0 }}
+                  >
+                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
-              <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%" }}>
-                {loading ? "Saving…" : "Reset Password"}
+
+              <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%", marginTop: 6 }}>
+                {loading ? "Saving…" : "Reset password →"}
               </button>
             </form>
           </>

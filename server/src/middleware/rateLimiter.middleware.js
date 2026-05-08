@@ -33,8 +33,8 @@ export const authLimiter = rateLimit({
  * Prevents scrapers and accidental loops
  */
 export const apiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 200,
+  windowMs: 60 * 1000,
+  max: env.isDev ? 1000 : 200, // relaxed in dev
   handler: rateLimitResponse,
   standardHeaders: true,
   legacyHeaders: false,

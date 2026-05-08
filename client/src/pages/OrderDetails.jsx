@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchOrderById, updateOrderStatus, softDeleteOrder, updateOrderDetails } from "../services/order.api";
+import { getBusinessProfile } from "../services/business.api";
 import StatusBadge from "../components/StatusBadge";
 import BillModal from "../components/bill/BillModal";
 import RecordPaymentModal from "../components/payments/RecordPaymentModal";
@@ -21,6 +22,7 @@ export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
+  const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
@@ -34,6 +36,14 @@ export default function OrderDetails() {
       .catch(() => navigate("/orders"))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    getBusinessProfile()
+      .then(setBusiness)
+      .catch(console.error);
+  }, []);
+
+  const businessName = business?.name || "My Business";
 
   const handleStatusChange = async (nextStatus) => {
     if (!window.confirm(`Mark as ${nextStatus}?`)) return;
@@ -91,7 +101,6 @@ export default function OrderDetails() {
 
   const isEditable = !["DELIVERED", "CANCELLED"].includes(order.status) && !order.isDeleted;
   const nextStatuses = STATUS_TRANSITIONS[order.status] || [];
-  const businessName = "My Business";
 
   return (
     <>
@@ -168,7 +177,7 @@ export default function OrderDetails() {
               {order.payment?.remainingAmount > 0 && (
                 <WhatsAppBtn label="Pay Reminder" url={getPaymentReminderUrl(order, businessName)} color="#B45309" bg="#FEF9C3" />
               )}
-              <WhatsAppBtn label="Bill" url={getBillUrl(order, businessName)} color="#1D4ED8" bg="#DBEAFE" />
+              <WhatsAppBtn label="Bill" url={getBillUrl(order, businessName, business?.upiId)} color="#1D4ED8" bg="#DBEAFE" />
             </div>
           </div>
         )}
@@ -235,20 +244,20 @@ export default function OrderDetails() {
           <p className="section-label">Payment</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <PayRow label="Subtotal" value={formatCurrency(order.financial?.subtotal)} />
-            {order.financial?.discountAmount > 0 && <PayRow label="Discount" value={`-${formatCurrency(order.financial.discountAmount)}`} valueColor="var(--color-accent)" />}
+            {order.financial?.discountAmount > 0 && <PayRow label="Discount" value={`-${formatCurrency(order.financial.discountAmount)}`} valueColor="var(--color-success)" />}
             {order.financial?.taxAmount > 0 && <PayRow label={`Tax (${order.financial.taxRate}%)`} value={formatCurrency(order.financial.taxAmount)} />}
             <div style={{ height: 1, background: "var(--color-border)" }} />
             <PayRow label="Total" value={formatCurrency(order.financial?.total)} bold />
-            <PayRow label="Amount Paid" value={formatCurrency(order.payment?.totalPaid)} valueColor="var(--color-accent)" />
+            <PayRow label="Amount Paid" value={formatCurrency(order.payment?.totalPaid)} valueColor="var(--color-success)" />
             <div style={{ height: 1, background: "var(--color-border)" }} />
             <PayRow
               label="Balance Due"
               value={formatCurrency(order.payment?.remainingAmount)}
-              valueColor={order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-accent)"}
+              valueColor={order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-success)"}
               bold
             />
           </div>
-          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ marginTop: 14 }}>
             <StatusBadge status={order.payment?.status} />
           </div>
         </div>
@@ -265,7 +274,7 @@ export default function OrderDetails() {
                     {formatDate(txn.recordedAt)}{txn.note ? ` · ${txn.note}` : ""}
                   </p>
                 </div>
-                <p className="amount" style={{ fontWeight: 600, color: "var(--color-accent)" }}>{formatCurrency(txn.amount)}</p>
+                <p className="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>{formatCurrency(txn.amount)}</p>
               </div>
             ))}
           </div>
@@ -283,7 +292,13 @@ export default function OrderDetails() {
         )}
       </div>
 
-      {showBill && <BillModal order={order} onClose={() => setShowBill(false)} />}
+      {showBill && (
+        <BillModal
+          order={order}
+          onClose={() => setShowBill(false)}
+          business={business}
+        />
+      )}
       {showPaymentModal && (
         <RecordPaymentModal
           order={order}
