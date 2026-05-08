@@ -1,1 +1,1 @@
-Custom App for Plant Nursery
+App to automate and optimize bussiness workflows
