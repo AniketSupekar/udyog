@@ -1,27 +1,32 @@
 // src/config/redis.js
-// Redis connection with graceful degradation
-// If Redis is down, cache operations are no-ops — app keeps working
 import Redis from "ioredis";
 import { env } from "./env.js";
 
 const redisUrl = env.isProd ? env.REDIS_PROD_URL : env.REDIS_LOCAL_URL;
 
-const redis = new Redis(redisUrl, {
-  maxRetriesPerRequest: 3,
-  retryStrategy(times) {
-    if (times > 3) return null; // Stop retrying after 3 attempts
-    return Math.min(times * 200, 2000);
-  },
-  lazyConnect: true,
-});
+// If no Redis URL configured, export no-op functions — app works without cache
+if (!redisUrl) {
+  console.warn("⚠️  No Redis URL configured — caching disabled");
+}
 
-redis.on("connect", () => console.log("✅ Redis connected"));
-redis.on("error", (err) => console.error("❌ Redis error:", err.message));
+const redis = redisUrl
+  ? new Redis(redisUrl, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times) {
+        if (times > 3) return null;
+        return Math.min(times * 200, 2000);
+      },
+      lazyConnect: true,
+    })
+  : null;
 
-/**
- * GET from cache — returns null on any failure (graceful degradation)
- */
+if (redis) {
+  redis.on("connect", () => console.log("✅ Redis connected"));
+  redis.on("error", (err) => console.error("❌ Redis error:", err.message));
+}
+
 export const getCache = async (key) => {
+  if (!redis) return null;
   try {
     const data = await redis.get(key);
     return data ? JSON.parse(data) : null;
@@ -30,21 +35,17 @@ export const getCache = async (key) => {
   }
 };
 
-/**
- * SET to cache with TTL in seconds
- */
 export const setCache = async (key, value, ttl = 60) => {
+  if (!redis) return;
   try {
     await redis.set(key, JSON.stringify(value), "EX", ttl);
   } catch {
-    // Silent fail — cache miss is acceptable
+    // Silent fail
   }
 };
 
-/**
- * DELETE by exact key or wildcard pattern
- */
 export const delCache = async (pattern) => {
+  if (!redis) return;
   try {
     if (!pattern.includes("*")) {
       await redis.del(pattern);
@@ -52,13 +53,7 @@ export const delCache = async (pattern) => {
     }
     let cursor = 0;
     do {
-      const [nextCursor, keys] = await redis.scan(
-        cursor,
-        "MATCH",
-        pattern,
-        "COUNT",
-        100
-      );
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
       cursor = Number(nextCursor);
       if (keys.length) await redis.del(...keys);
     } while (cursor !== 0);
