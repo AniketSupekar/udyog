@@ -1,9 +1,8 @@
-// src/pages/ForgotPassword.jsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { forgotPassword } from "../services/auth.api";
 import { useToast } from "../context/ToastContext";
-import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export default function ForgotPassword() {
   const { toast } = useToast();
@@ -25,48 +24,61 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <div className="auth-screen">
+      <div className="auth-card animate-in">
 
-        <Link to="/login" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.875rem", color: "var(--color-accent)", textDecoration: "none", marginBottom: 32, fontWeight: 500 }}>
-          <ArrowLeft size={16} /> Back to login
+        <Link
+          to="/login"
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--color-text-tertiary)", fontSize: "0.8125rem", textDecoration: "none", marginBottom: 24 }}
+        >
+          <ArrowLeft size={14} /> Back to login
         </Link>
 
         {sent ? (
-          <div style={{ textAlign: "center", background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", padding: "40px 24px" }}>
-            <div style={{ width: 56, height: 56, background: "#F0FDF4", border: "2px solid #BBF7D0", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-              <CheckCircle size={26} color="var(--color-accent)" />
+          <div style={{ textAlign: "center", paddingTop: 8 }}>
+            <div style={{ width: 44, height: 44, background: "var(--color-accent-light)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
             </div>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-text-primary)" }}>Check your email</h2>
-            <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginTop: 8 }}>
-              If an account exists for <strong>{email}</strong>, we've sent a password reset link.
+            <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-text-primary)", letterSpacing: "-0.02em", marginBottom: 6 }}>
+              Check your inbox
+            </h2>
+            <p style={{ fontSize: "0.8125rem", color: "var(--color-text-tertiary)", lineHeight: 1.6 }}>
+              If an account exists for <strong style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{email}</strong>, a reset link is on its way.
+            </p>
+            <p style={{ fontSize: "0.75rem", color: "var(--color-text-placeholder)", marginTop: 20 }}>
+              Didn't get it?{" "}
+              <button
+                type="button"
+                onClick={() => setSent(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-accent)", fontWeight: 500, fontSize: "0.75rem", fontFamily: "var(--font-sans)", padding: 0 }}
+              >
+                Try again
+              </button>
             </p>
           </div>
         ) : (
           <>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.03em", marginBottom: 8 }}>
-              Forgot password?
-            </h1>
-            <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginBottom: 28 }}>
-              Enter your email and we'll send a reset link.
-            </p>
+            <h1 className="auth-heading">Forgot password?</h1>
+            <p className="auth-sub">Enter your email and we'll send a reset link.</p>
 
-            <form onSubmit={handleSubmit} style={{ background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", padding: "28px 24px", boxShadow: "var(--shadow-sm)" }}>
-              <label style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                <Mail size={14} /> Email Address
-              </label>
-              <input
-                className="input"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-                style={{ marginBottom: 16 }}
-              />
-              <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%" }}>
-                {loading ? "Sending…" : "Send Reset Link"}
+            <form onSubmit={handleSubmit}>
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="email">Email address</label>
+                <input
+                  id="email"
+                  className="input"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%", marginTop: 6 }}>
+                {loading ? "Sending…" : "Send reset link →"}
               </button>
             </form>
           </>

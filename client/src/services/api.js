@@ -11,8 +11,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired — redirect to login
-      window.location.href = "/login";
+      const path = window.location.pathname;
+      const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
+      
+      // Only redirect if NOT already on a public page
+      if (!publicPaths.includes(path)) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

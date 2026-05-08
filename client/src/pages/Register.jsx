@@ -1,33 +1,23 @@
-// src/pages/Register.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { register } from "../services/auth.api";
+import { register, verifyEmail, resendOTP } from "../services/auth.api";
 import { useToast } from "../context/ToastContext";
-import { Building2, User, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [step, setStep] = useState(1); // 1=form, 2=verify OTP
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
+  const [form, setForm] = useState({ businessName: "", name: "", email: "", password: "" });
 
-  const [form, setForm] = useState({
-    businessName: "",
-    name: "",
-    email: "",
-    password: "",
-  });
-
-  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+  const update = (field, value) => setForm(f => ({ ...f, [field]: value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.password.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
+    if (form.password.length < 8) { toast.error("Password must be at least 8 characters"); return; }
     setLoading(true);
     try {
       await register(form);
@@ -40,148 +30,116 @@ export default function Register() {
     }
   };
 
-  if (step === 2) {
-    return <VerifyOTPStep email={registeredEmail} />;
-  }
+  if (step === 2) return <VerifyOTPStep email={registeredEmail} onBack={() => setStep(1)} />;
+
+  const fields = [
+    { id: "businessName", label: "Business name", placeholder: "e.g. Green Valley Nursery", type: "text", autoComplete: "organization" },
+    { id: "name",         label: "Your name",      placeholder: "John Doe",                  type: "text", autoComplete: "name" },
+    { id: "email",        label: "Email",           placeholder: "you@example.com",           type: "email", autoComplete: "email" },
+  ];
 
   return (
-    <div style={{
-      minHeight: "100dvh",
-      background: "var(--color-bg)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "24px 16px",
-    }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <div className="auth-screen">
+      <div className="auth-card animate-in">
 
-        {/* Logo / Brand */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{
-            width: 48, height: 48,
-            background: "var(--color-accent)",
-            borderRadius: 14,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 16px",
-          }}>
-            <Building2 size={24} color="white" />
-          </div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.03em" }}>
-            Create your account
-          </h1>
-          <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginTop: 6 }}>
-            Start managing orders in minutes
-          </p>
-        </div>
+        <h1 className="auth-heading" style={{ textAlign: "center" }}>Create account</h1>
+        <p className="auth-sub" style={{ textAlign: "center" }}>Start managing your business in minutes</p>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", padding: "28px 24px", boxShadow: "var(--shadow-sm)" }}>
+        <form onSubmit={handleSubmit}>
+          {fields.map(f => (
+            <div className="auth-field" key={f.id}>
+              <label className="auth-label" htmlFor={f.id}>{f.label}</label>
+              <input
+                id={f.id}
+                className="input"
+                type={f.type}
+                placeholder={f.placeholder}
+                autoComplete={f.autoComplete}
+                value={form[f.id]}
+                onChange={e => update(f.id, e.target.value)}
+                required
+                autoFocus={f.id === "businessName"}
+              />
+            </div>
+          ))}
 
-          <Field label="Business Name" icon={Building2}>
-            <input
-              className="input"
-              placeholder="e.g. Green Valley Nursery"
-              value={form.businessName}
-              onChange={(e) => update("businessName", e.target.value)}
-              required
-              autoFocus
-            />
-          </Field>
-
-          <Field label="Your Name" icon={User}>
-            <input
-              className="input"
-              placeholder="John Doe"
-              value={form.name}
-              onChange={(e) => update("name", e.target.value)}
-              required
-            />
-          </Field>
-
-          <Field label="Email Address" icon={Mail}>
-            <input
-              className="input"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              value={form.email}
-              onChange={(e) => update("email", e.target.value)}
-              required
-            />
-          </Field>
-
-          <Field label="Password" icon={Lock}>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="password">Password</label>
             <div style={{ position: "relative" }}>
               <input
+                id="password"
                 className="input"
                 type={showPassword ? "text" : "password"}
                 placeholder="Min. 8 characters"
                 autoComplete="new-password"
                 value={form.password}
-                onChange={(e) => update("password", e.target.value)}
+                onChange={e => update("password", e.target.value)}
                 required
-                style={{ paddingRight: 44 }}
+                style={{ paddingRight: 40 }}
               />
               <button
                 type="button"
-                onClick={() => setShowPassword((p) => !p)}
-                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)" }}
+                onClick={() => setShowPassword(p => !p)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-placeholder)", display: "flex", alignItems: "center", padding: 0 }}
               >
-                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-          </Field>
+          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary"
-            style={{ width: "100%", marginTop: 8 }}
-          >
-            {loading ? "Creating account…" : (
-              <>Create Account <ArrowRight size={16} /></>
-            )}
+          <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%", marginTop: 6 }}>
+            {loading ? "Creating account…" : "Create account →"}
           </button>
         </form>
 
-        <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--color-text-secondary)", marginTop: 20 }}>
+        <p className="auth-footer">
           Already have an account?{" "}
-          <Link to="/login" style={{ color: "var(--color-accent)", fontWeight: 600, textDecoration: "none" }}>
-            Sign in
-          </Link>
+          <Link to="/login">Sign in</Link>
         </p>
       </div>
     </div>
   );
 }
 
-function Field({ label, icon: Icon, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-        <Icon size={14} />
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-// ─── OTP Verification Step ────────────────────────────────────────────
-function VerifyOTPStep({ email }) {
+function VerifyOTPStep({ email, onBack }) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const inputs = useRef([]);
+
+  const handleChange = (index, value) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const next = [...otp];
+    next[index] = digit;
+    setOtp(next);
+    if (digit && index < 5) inputs.current[index + 1]?.focus();
+  };
+
+  const handleKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pasted.length === 6) {
+      setOtp(pasted.split(""));
+      inputs.current[5]?.focus();
+    }
+  };
+
+  const code = otp.join("");
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    if (otp.length !== 6) { toast.error("Enter the 6-digit code"); return; }
+    if (code.length !== 6) { toast.error("Enter the 6-digit code"); return; }
     setLoading(true);
     try {
-      const { verifyEmail } = await import("../services/auth.api");
-      await verifyEmail({ email, otp });
+      await verifyEmail({ email, otp: code });
       toast.success("Email verified! Welcome aboard 🎉");
       navigate("/onboarding");
     } catch (err) {
@@ -194,7 +152,6 @@ function VerifyOTPStep({ email }) {
   const handleResend = async () => {
     setResending(true);
     try {
-      const { resendOTP } = await import("../services/auth.api");
       await resendOTP({ email });
       toast.success("New code sent to your email");
     } catch {
@@ -205,45 +162,69 @@ function VerifyOTPStep({ email }) {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 420, textAlign: "center" }}>
-        <div style={{ width: 64, height: 64, background: "#F0FDF4", border: "2px solid #BBF7D0", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-          <Mail size={28} color="var(--color-accent)" />
+    <div className="auth-screen">
+      <div className="auth-card animate-in">
+
+        <button
+          type="button"
+          onClick={onBack}
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)", fontSize: "0.8125rem", padding: 0, marginBottom: 24, fontFamily: "var(--font-sans)" }}
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
+
+        <div style={{ width: 44, height: 44, background: "var(--color-accent-light)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
         </div>
-        <h1 style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>
-          Check your email
-        </h1>
-        <p style={{ fontSize: "0.9rem", color: "var(--color-text-secondary)", marginTop: 8, marginBottom: 32 }}>
-          We sent a 6-digit code to <strong>{email}</strong>
+
+        <h1 className="auth-heading" style={{ textAlign: "center" }}>Check your email</h1>
+        <p className="auth-sub" style={{ marginBottom: 20 }}>
+          We sent a 6-digit code to <strong style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{email}</strong>
         </p>
 
-        <form onSubmit={handleVerify} style={{ background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", padding: "28px 24px", boxShadow: "var(--shadow-sm)" }}>
-          <input
-            className="input"
-            placeholder="Enter 6-digit code"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            maxLength={6}
-            style={{ textAlign: "center", fontSize: "1.5rem", fontFamily: "var(--font-mono)", letterSpacing: "0.3em" }}
-            autoFocus
-          />
+        <form onSubmit={handleVerify}>
+          <div className="otp-grid" onPaste={handlePaste}>
+            {otp.map((digit, i) => (
+              <input
+                key={i}
+                ref={el => inputs.current[i] = el}
+                className="otp-box"
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={e => handleChange(i, e.target.value)}
+                onKeyDown={e => handleKeyDown(i, e)}
+                autoFocus={i === 0}
+                aria-label={`Digit ${i + 1}`}
+              />
+            ))}
+          </div>
+
           <button
             type="submit"
-            disabled={loading || otp.length !== 6}
+            disabled={loading || code.length !== 6}
             className="btn btn-primary"
-            style={{ width: "100%", marginTop: 16 }}
+            style={{ width: "100%" }}
           >
-            {loading ? "Verifying…" : "Verify Email"}
+            {loading ? "Verifying…" : "Verify email →"}
           </button>
         </form>
 
-        <button
-          onClick={handleResend}
-          disabled={resending}
-          style={{ marginTop: 20, background: "none", border: "none", cursor: "pointer", fontSize: "0.875rem", color: "var(--color-accent)", fontWeight: 500 }}
-        >
-          {resending ? "Sending…" : "Didn't get it? Resend code"}
-        </button>
+        <p className="auth-footer" style={{ marginTop: 16 }}>
+          Didn't get it?{" "}
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resending}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-accent)", fontWeight: 500, fontSize: "0.8rem", fontFamily: "var(--font-sans)", padding: 0 }}
+          >
+            {resending ? "Sending…" : "Resend code"}
+          </button>
+        </p>
       </div>
     </div>
   );
