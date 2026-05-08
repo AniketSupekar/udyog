@@ -43,6 +43,8 @@ app.use(cors({
   credentials: true,
 }));
 
+app.options("*", cors()); // ADD THIS LINE — handles all preflight requests
+
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
