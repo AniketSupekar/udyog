@@ -92,7 +92,9 @@ export default function OrderDetails() {
   if (loading) {
     return (
       <div className="page">
-        {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 120, borderRadius: 16, marginBottom: 12 }} />)}
+        {[1, 2, 3].map(i => (
+          <div key={i} className="skeleton" style={{ height: 120, borderRadius: 16, marginBottom: 12 }} />
+        ))}
       </div>
     );
   }
@@ -154,7 +156,11 @@ export default function OrderDetails() {
             </button>
           ))}
           {order.payment?.remainingAmount > 0 && (
-            <button className="btn btn-sm" style={{ background: "#EFF6FF", color: "#1D4ED8", border: "1.5px solid #BFDBFE" }} onClick={() => setShowPaymentModal(true)}>
+            <button
+              className="btn btn-sm"
+              style={{ background: "#EFF6FF", color: "#1D4ED8", border: "1.5px solid #BFDBFE" }}
+              onClick={() => setShowPaymentModal(true)}
+            >
               <IndianRupee size={14} /> Record Payment
             </button>
           )}
@@ -173,11 +179,26 @@ export default function OrderDetails() {
           <div className="card" style={{ padding: "14px 16px", marginBottom: 12, background: "#F0FDF4", border: "1.5px solid #BBF7D0" }}>
             <p className="section-label" style={{ marginBottom: 10 }}>Send on WhatsApp</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <WhatsAppBtn label="Confirmation" url={getConfirmationUrl(order, businessName)} color="#15803D" bg="#DCFCE7" />
+              <WhatsAppBtn
+                label="Confirmation"
+                color="#15803D"
+                bg="#DCFCE7"
+                onClick={() => getConfirmationUrl(order, businessName)}
+              />
               {order.payment?.remainingAmount > 0 && (
-                <WhatsAppBtn label="Pay Reminder" url={getPaymentReminderUrl(order, businessName)} color="#B45309" bg="#FEF9C3" />
+                <WhatsAppBtn
+                  label="Pay Reminder"
+                  color="#B45309"
+                  bg="#FEF9C3"
+                  onClick={() => getPaymentReminderUrl(order, businessName, business?.upiId)}
+                />
               )}
-              <WhatsAppBtn label="Bill" url={getBillUrl(order, businessName, business?.upiId)} color="#1D4ED8" bg="#DBEAFE" />
+              <WhatsAppBtn
+                label="Bill"
+                color="#1D4ED8"
+                bg="#DBEAFE"
+                onClick={() => getBillUrl(order, businessName, business?.upiId)}
+              />
             </div>
           </div>
         )}
@@ -195,7 +216,9 @@ export default function OrderDetails() {
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <p style={{ fontWeight: 600, fontSize: "1rem", color: "var(--color-text-primary)" }}>{order.clientSnapshot?.name}</p>
               <p style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>📞 {order.clientSnapshot?.phone}</p>
-              {order.clientSnapshot?.address && <p style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>📍 {order.clientSnapshot?.address}</p>}
+              {order.clientSnapshot?.address && (
+                <p style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>📍 {order.clientSnapshot?.address}</p>
+              )}
             </div>
           )}
         </div>
@@ -226,7 +249,10 @@ export default function OrderDetails() {
           <p className="section-label">Order Items</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {order.items?.map((item, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.items.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+              <div
+                key={i}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.items.length - 1 ? "1px solid var(--color-border)" : "none" }}
+              >
                 <div>
                   <p style={{ fontWeight: 500, fontSize: "0.9375rem", color: "var(--color-text-primary)" }}>{item.productName}</p>
                   <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>
@@ -244,8 +270,12 @@ export default function OrderDetails() {
           <p className="section-label">Payment</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <PayRow label="Subtotal" value={formatCurrency(order.financial?.subtotal)} />
-            {order.financial?.discountAmount > 0 && <PayRow label="Discount" value={`-${formatCurrency(order.financial.discountAmount)}`} valueColor="var(--color-success)" />}
-            {order.financial?.taxAmount > 0 && <PayRow label={`Tax (${order.financial.taxRate}%)`} value={formatCurrency(order.financial.taxAmount)} />}
+            {order.financial?.discountAmount > 0 && (
+              <PayRow label="Discount" value={`-${formatCurrency(order.financial.discountAmount)}`} valueColor="var(--color-success)" />
+            )}
+            {order.financial?.taxAmount > 0 && (
+              <PayRow label={`Tax (${order.financial.taxRate}%)`} value={formatCurrency(order.financial.taxAmount)} />
+            )}
             <div style={{ height: 1, background: "var(--color-border)" }} />
             <PayRow label="Total" value={formatCurrency(order.financial?.total)} bold />
             <PayRow label="Amount Paid" value={formatCurrency(order.payment?.totalPaid)} valueColor="var(--color-success)" />
@@ -267,7 +297,10 @@ export default function OrderDetails() {
           <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
             <p className="section-label">Payment History</p>
             {order.payment.transactions.map((txn, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.payment.transactions.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+              <div
+                key={i}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.payment.transactions.length - 1 ? "1px solid var(--color-border)" : "none" }}
+              >
                 <div>
                   <p style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--color-text-primary)" }}>{txn.method}</p>
                   <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>
@@ -310,18 +343,15 @@ export default function OrderDetails() {
   );
 }
 
-function WhatsAppBtn({ label, url, color, bg }) {
-  if (!url) return null;
+function WhatsAppBtn({ label, onClick, color, bg }) {
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
+      onClick={onClick}
       className="btn btn-sm"
-      style={{ background: bg, color, border: `1.5px solid ${color}33`, textDecoration: "none" }}
+      style={{ background: bg, color, border: `1.5px solid ${color}33`, cursor: "pointer" }}
     >
       <MessageCircle size={13} /> {label}
-    </a>
+    </button>
   );
 }
 
@@ -329,7 +359,9 @@ function PayRow({ label, value, valueColor, bold }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <span style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>{label}</span>
-      <span className="amount" style={{ fontSize: bold ? "1rem" : "0.9375rem", fontWeight: bold ? 700 : 500, color: valueColor || "var(--color-text-primary)" }}>{value}</span>
+      <span className="amount" style={{ fontSize: bold ? "1rem" : "0.9375rem", fontWeight: bold ? 700 : 500, color: valueColor || "var(--color-text-primary)" }}>
+        {value}
+      </span>
     </div>
   );
 }

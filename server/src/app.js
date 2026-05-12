@@ -16,6 +16,7 @@ import paymentRoutes     from "./modules/payments/payment.routes.js";
 import productRoutes     from "./modules/products/product.routes.js";
 import analyticsRoutes   from "./modules/analytics/analytics.routes.js";
 import clientRoutes      from "./modules/clients/client.routes.js";
+import payRoutes         from "./modules/pay/pay.routes.js";
 
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { apiLimiter, authLimiter, cronLimiter } from "./middleware/rateLimiter.middleware.js";
@@ -64,6 +65,7 @@ app.use("/api/payments",      paymentRoutes);
 app.use("/api/products",      productRoutes);
 app.use("/api/analytics",     analyticsRoutes);
 app.use("/api/clients",       clientRoutes);
+app.use("/api/pay",           payRoutes);
 
 // ─── Cron ─────────────────────────────────────────────────────────────
 app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
