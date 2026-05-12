@@ -1,4 +1,4 @@
-# Udyog — Business Operations Management
+# Udyog : Business Operations Management
 
 Udyog is a mobile-first SaaS application that helps Indian small businesses manage orders, track deliveries, record payments, and send WhatsApp invoices with UPI payment links.
 
