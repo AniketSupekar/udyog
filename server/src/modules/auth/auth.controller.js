@@ -154,6 +154,11 @@ export const login = asyncHandler(async (req, res) => {
 
   if (!user.isActive) throw ApiError.forbidden("Account deactivated. Contact support.");
 
+  // Block login until email is verified
+  if (!user.isEmailVerified) {
+    throw ApiError.forbidden("Please verify your email before logging in. Check your inbox for the verification code.");
+  }
+
   const isMatch = await bcrypt.compare(password, user.passwordHash);
 
   if (!isMatch) {

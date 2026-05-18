@@ -466,14 +466,17 @@ textarea.input {
 .auth-link:hover { text-decoration: underline; }
 
 /* OTP boxes */
+/* OTP boxes — replace existing .otp-grid and .otp-box */
 .otp-grid {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 14px;
+  width: 100%;
 }
 
 .otp-box {
   flex: 1;
+  min-width: 0;        /* critical — prevents overflow */
   height: 48px;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);

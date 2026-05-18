@@ -1,4 +1,9 @@
 node_modules/
 .env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.*.local
 .DS_Store
 .vercel/
