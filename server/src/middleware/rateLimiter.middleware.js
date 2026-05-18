@@ -15,12 +15,12 @@ const rateLimitResponse = (req, res) => {
 
 /**
  * Auth routes — login, register
- * Strict: 10 attempts per 15 minutes per IP
+ * Strict: 50 attempts per 15 minutes per IP
  * Prevents brute force password attacks
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: env.isDev ? 100 : 10, // relaxed in dev
+  max: env.isDev ? 100 : 50, 
   handler: rateLimitResponse,
   standardHeaders: true,
   legacyHeaders: false,
