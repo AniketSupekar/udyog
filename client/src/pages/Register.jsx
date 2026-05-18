@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register, verifyEmail, resendOTP } from "../services/auth.api";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
@@ -105,6 +106,7 @@ export default function Register() {
 function VerifyOTPStep({ email, onBack }) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { saveToken } = useAuth();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -139,7 +141,9 @@ function VerifyOTPStep({ email, onBack }) {
     if (code.length !== 6) { toast.error("Enter the 6-digit code"); return; }
     setLoading(true);
     try {
-      await verifyEmail({ email, otp: code });
+      const res = await verifyEmail({ email, otp: code });
+      const { token } = res.data.data;
+      saveToken(token);
       toast.success("Email verified! Welcome aboard 🎉");
       navigate("/onboarding");
     } catch (err) {

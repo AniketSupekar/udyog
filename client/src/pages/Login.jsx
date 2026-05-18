@@ -6,7 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
-  const { setUser } = useAuth();
+  const { setUser, saveToken } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -19,9 +19,10 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await login({ email, password });
-      const user = res.data.data;
-      setUser(user);
-      navigate(user.onboardingCompleted ? "/dashboard" : "/onboarding");
+      const { token, ...userData } = res.data.data;
+      saveToken(token);
+      setUser(userData);
+      navigate(userData.onboardingCompleted ? "/dashboard" : "/onboarding");
     } catch (err) {
       toast.error(err.response?.data?.message || "Invalid email or password");
     } finally {

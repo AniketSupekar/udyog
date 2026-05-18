@@ -11,11 +11,10 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         const res = await getMe();
-        // API returns { success, message, data: { userId, businessId } }
-        // axios wraps it in res.data — so res.data.data is the actual user
         setUser(res.data.data);
       } catch {
         setUser(null);
+        localStorage.removeItem("token");
       } finally {
         setLoading(false);
       }
@@ -24,18 +23,24 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  // Call this after login or verifyEmail to store token
+  const saveToken = (token) => {
+    if (token) localStorage.setItem("token", token);
+  };
+
   const logout = async () => {
     try {
       await logoutApi();
     } catch (err) {
       console.error("Logout failed", err);
     } finally {
+      localStorage.removeItem("token");
       setUser(null);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, logout, saveToken }}>
       {children}
     </AuthContext.Provider>
   );

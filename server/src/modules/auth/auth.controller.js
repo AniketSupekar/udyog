@@ -12,7 +12,7 @@ import { generateOTP, generateResetToken, hashToken } from "../../utils/token.js
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../config/email.js";
 
 const MAX_FAILED_ATTEMPTS = 10;
-const LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const LOCK_DURATION_MS = 30 * 60 * 1000;
 
 const cookieOptions = {
   httpOnly: true,
@@ -38,11 +38,9 @@ export const register = asyncHandler(async (req, res) => {
   if (!password || password.length < 8)
     throw ApiError.badRequest("Password must be at least 8 characters");
 
-  // Check email taken
   const existing = await User.findOne({ email: email.toLowerCase().trim() });
   if (existing) throw ApiError.conflict("An account with this email already exists");
 
-  // Use a transaction — both Business + User must be created together
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -51,38 +49,30 @@ export const register = asyncHandler(async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     const [user] = await User.create(
-      [
-        {
-          businessId: business._id,
-          name: name.trim(),
-          email: email.toLowerCase().trim(),
-          passwordHash,
-          role: "ADMIN",
-          emailOTP: otp,
-          emailOTPExpiry: otpExpiry,
-        },
-      ],
+      [{
+        businessId: business._id,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        passwordHash,
+        role: "ADMIN",
+        emailOTP: otp,
+        emailOTPExpiry: otpExpiry,
+      }],
       { session }
     );
 
     await session.commitTransaction();
 
-    // Send verification email (non-blocking — don't fail register if email fails)
     sendVerificationEmail({ to: email, name: name.trim(), otp }).catch(console.error);
 
-    sendSuccess(
-      res,
-      {
-        userId: user._id,
-        email: user.email,
-        requiresVerification: true,
-      },
-      "Account created! Check your email for a verification code.",
-      201
-    );
+    sendSuccess(res, {
+      userId: user._id,
+      email: user.email,
+      requiresVerification: true,
+    }, "Account created! Check your email for a verification code.", 201);
   } catch (err) {
     await session.abortTransaction();
     throw err;
@@ -110,11 +100,11 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   user.emailOTPExpiry = undefined;
   await user.save();
 
-  // Auto-login after verification
   const token = signToken(user);
   res.cookie("token", token, cookieOptions);
 
   sendSuccess(res, {
+    token, // returned in body for localStorage fallback
     userId: user._id,
     businessId: user.businessId,
     name: user.name,
@@ -154,23 +144,19 @@ export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: email.toLowerCase().trim() })
     .select("+passwordHash +failedLoginAttempts +lockedUntil");
 
-  // Generic error — don't reveal if email exists
   const invalidErr = ApiError.unauthorized("Invalid email or password");
   if (!user) throw invalidErr;
 
-  // Check account lock
   if (user.lockedUntil && new Date() < user.lockedUntil) {
     const minutesLeft = Math.ceil((user.lockedUntil - new Date()) / 60000);
     throw ApiError.forbidden(`Account locked. Try again in ${minutesLeft} minutes.`);
   }
 
-  // Check account active
   if (!user.isActive) throw ApiError.forbidden("Account deactivated. Contact support.");
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
 
   if (!isMatch) {
-    // Track failed attempts
     user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
     if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
       user.lockedUntil = new Date(Date.now() + LOCK_DURATION_MS);
@@ -180,7 +166,6 @@ export const login = asyncHandler(async (req, res) => {
     throw invalidErr;
   }
 
-  // Successful login — reset counters
   user.failedLoginAttempts = 0;
   user.lockedUntil = null;
   user.lastLoginAt = new Date();
@@ -190,6 +175,7 @@ export const login = asyncHandler(async (req, res) => {
   res.cookie("token", token, cookieOptions);
 
   sendSuccess(res, {
+    token, // returned in body for localStorage fallback
     userId: user._id,
     businessId: user.businessId,
     name: user.name,
@@ -208,14 +194,13 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email: email.toLowerCase() })
     .select("+passwordResetToken +passwordResetExpiry");
 
-  // Always respond OK — don't reveal if account exists (security)
   if (!user) {
     return sendSuccess(res, null, "If an account exists, a reset link has been sent.");
   }
 
   const token = generateResetToken();
   user.passwordResetToken = hashToken(token);
-  user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
   const resetUrl = `${env.APP_URL}/reset-password?token=${token}`;
@@ -260,7 +245,11 @@ export const completeOnboarding = asyncHandler(async (req, res) => {
 
 /* ─── POST /api/auth/logout ──────────────────────────────────────────── */
 export const logout = asyncHandler(async (req, res) => {
-  res.clearCookie("token", { httpOnly: true, secure: env.isProd, sameSite: env.isProd ? "none" : "lax" });
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: env.isProd,
+    sameSite: env.isProd ? "none" : "lax",
+  });
   sendSuccess(res, null, "Logged out successfully");
 });
 
