@@ -28,15 +28,46 @@ export default function NotificationBell() {
   useEffect(() => { if (open) fetchNotifications(); }, [open]);
 
   return (
-    <div className="relative" ref={bellRef}>
+    <div style={{ position: "relative" }} ref={bellRef}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative p-2 rounded-full hover:bg-gray-100 transition"
         aria-label="Notifications"
+        style={{
+          position: "relative",
+          width: 38,
+          height: 38,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-md)",
+          cursor: "pointer",
+          transition: "all 0.15s",
+          flexShrink: 0,
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = "var(--color-border-strong)"}
+        onMouseLeave={e => e.currentTarget.style.borderColor = "var(--color-border)"}
       >
-        <Bell size={22} className={unreadCount > 0 ? "text-blue-600" : "text-gray-600"} />
+        <Bell size={18} color={unreadCount > 0 ? "var(--color-accent)" : "var(--color-text-secondary)"} />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center px-1">
+          <span style={{
+            position: "absolute",
+            top: -4,
+            right: -4,
+            minWidth: 16,
+            height: 16,
+            background: "var(--color-danger)",
+            color: "white",
+            borderRadius: "var(--radius-full)",
+            fontSize: "0.625rem",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 4px",
+            border: "1.5px solid var(--color-surface)",
+          }}>
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

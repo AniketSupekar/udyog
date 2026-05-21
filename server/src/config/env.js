@@ -28,6 +28,8 @@ export const env = {
   REDIS_PROD_URL: process.env.REDIS_PROD_URL || "",
   RESEND_API_KEY: process.env.RESEND_API_KEY || "",
   APP_URL: process.env.APP_URL || "http://localhost:5173",
+  GMAIL_USER: process.env.GMAIL_USER || "",
+  GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD || "",
   isProd,
   isDev: !isProd,
 };

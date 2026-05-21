@@ -3,11 +3,18 @@ import { useEffect, useState, useRef } from "react";
 import { fetchOrders } from "../services/order.api";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
-import { Search, Plus, X, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, X, SlidersHorizontal, Phone } from "lucide-react";
 import { formatDate } from "../utils/date.util";
 import { formatCurrency } from "../utils/currency.util";
 
 const STATUS_FILTERS = ["", "CREATED", "PENDING", "DELIVERED", "CANCELLED"];
+
+const STATUS_BORDER = {
+  CREATED: "#6366F1",
+  PENDING: "#D97706",
+  DELIVERED: "#16A34A",
+  CANCELLED: "#9CA3AF",
+};
 
 export default function OrdersList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,49 +146,55 @@ export default function OrdersList() {
       ) : (
         <>
           <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {orders.map(order => (
-              <Link
-                key={order._id}
-                to={`/orders/${order._id}`}
-                style={{ textDecoration: "none" }}
-              >
-                <div
-                  className="card"
-                  style={{ padding: "14px 16px", transition: "all 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = ""}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {order.clientSnapshot?.name}
-                      </p>
-                      <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 3 }}>
-                        📞 {order.clientSnapshot?.phone}
-                      </p>
+            {orders.map(order => {
+              const borderColor = STATUS_BORDER[order.status] || "var(--color-border-strong)";
+              return (
+                <Link key={order._id} to={`/orders/${order._id}`} style={{ textDecoration: "none" }}>
+                  <div
+                    style={{
+                      background: "var(--color-surface)",
+                      border: "1.5px solid var(--color-border)",
+                      borderLeft: `3px solid ${borderColor}`,
+                      borderRadius: "var(--radius-xl)",
+                      padding: "14px 16px",
+                      transition: "box-shadow 0.15s",
+                      boxShadow: "var(--shadow-xs)",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "var(--shadow-xs)"}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {order.clientSnapshot?.name}
+                        </p>
+                        <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                          <Phone size={11} /> {order.clientSnapshot?.phone}
+                        </p>
+                      </div>
+                      <StatusBadge status={order.status} />
                     </div>
-                    <StatusBadge status={order.status} />
+                    <div style={{ height: 1, background: "var(--color-border)", margin: "10px 0" }} />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <div>
+                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Delivery</p>
+                        <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-primary)" }}>{formatDate(order.deliveryDate)}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Total</p>
+                        <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 500 }}>{formatCurrency(order.financial?.total)}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Balance</p>
+                        <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 600, color: order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
+                          {order.payment?.remainingAmount > 0 ? formatCurrency(order.payment?.remainingAmount) : "Paid ✓"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ height: 1, background: "var(--color-border)", margin: "12px 0" }} />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                    <div>
-                      <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Delivery</p>
-                      <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-primary)" }}>{formatDate(order.deliveryDate)}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Total</p>
-                      <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 500 }}>{formatCurrency(order.financial?.total)}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Balance</p>
-                      <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 600, color: order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
-                        {formatCurrency(order.payment?.remainingAmount)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
           {pagination?.totalPages > 1 && (
             <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 20, alignItems: "center" }}>
@@ -193,7 +206,6 @@ export default function OrdersList() {
         </>
       )}
 
-      {/* FAB — positioned at natural right thumb zone */}
       {!isDashboardView && (
         <Link
           to="/orders/create"

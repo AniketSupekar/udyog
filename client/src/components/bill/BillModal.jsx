@@ -13,7 +13,9 @@ export default function BillModal({ order, onClose, business }) {
     documentTitle: `Invoice_${order.clientSnapshot?.name?.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}`,
   });
 
-  const whatsappUrl = getBillUrl(order, business?.name || "My Business", business?.upiId);
+  const handleWhatsApp = () => {
+    getBillUrl(order, business?.name || "My Business", business?.upiId);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex justify-center items-start overflow-auto p-4 pb-24">
@@ -36,16 +38,12 @@ export default function BillModal({ order, onClose, business }) {
 
         {/* Actions */}
         <div className="px-5 py-4 border-t flex flex-wrap gap-3 justify-end bg-gray-50">
-          {whatsappUrl && (
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-            >
-              <MessageCircle size={15} /> Send on WhatsApp
-            </a>
-          )}
+          <button
+            onClick={handleWhatsApp}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          >
+            <MessageCircle size={15} /> Send on WhatsApp
+          </button>
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"

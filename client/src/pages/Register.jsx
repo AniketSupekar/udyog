@@ -35,8 +35,8 @@ export default function Register() {
 
   const fields = [
     { id: "businessName", label: "Business name", placeholder: "e.g. Green Valley Nursery", type: "text", autoComplete: "organization" },
-    { id: "name",         label: "Your name",      placeholder: "John Doe",                  type: "text", autoComplete: "name" },
-    { id: "email",        label: "Email",           placeholder: "you@example.com",           type: "email", autoComplete: "email" },
+    { id: "name", label: "Your name", placeholder: "John Doe", type: "text", autoComplete: "name" },
+    { id: "email", label: "Email", placeholder: "you@example.com", type: "email", autoComplete: "email" },
   ];
 
   return (
@@ -106,7 +106,7 @@ export default function Register() {
 function VerifyOTPStep({ email, onBack }) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { saveToken } = useAuth();
+  const { saveToken, setUser } = useAuth();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -136,22 +136,23 @@ function VerifyOTPStep({ email, onBack }) {
 
   const code = otp.join("");
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (code.length !== 6) { toast.error("Enter the 6-digit code"); return; }
-    setLoading(true);
-    try {
-      const res = await verifyEmail({ email, otp: code });
-      const { token } = res.data.data;
-      saveToken(token);
-      toast.success("Email verified! Welcome aboard 🎉");
-      navigate("/onboarding");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Invalid code. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+ const handleVerify = async (e) => {
+  e.preventDefault();
+  if (code.length !== 6) { toast.error("Enter the 6-digit code"); return; }
+  setLoading(true);
+  try {
+    const res = await verifyEmail({ email, otp: code });
+    const { token, ...userData } = res.data.data;
+    saveToken(token);
+    setUser(userData);
+    toast.success("Welcome to Udyog! 🎉");
+    navigate(userData.onboardingCompleted ? "/dashboard" : "/onboarding");
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Invalid code. Try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleResend = async () => {
     setResending(true);
@@ -179,8 +180,8 @@ function VerifyOTPStep({ email, onBack }) {
 
         <div style={{ width: 44, height: 44, background: "var(--color-accent-light)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
           </svg>
         </div>
 
