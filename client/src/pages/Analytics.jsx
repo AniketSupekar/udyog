@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 import { getAnalyticsOverview } from "../services/analytics.api";
 import { getBusinessSnapshot } from "../services/dashboard.api";
+import { fetchOrders } from "../services/order.api";
 import { formatCurrency } from "../utils/currency.util";
-import { TrendingUp, IndianRupee, CheckCircle, Users, CreditCard, BarChart2 } from "lucide-react";
+import { TrendingUp, IndianRupee, CheckCircle, Users, CreditCard, BarChart2, Plus } from "lucide-react";
 import { format, subMonths } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const MONTH_OPTIONS = Array.from({ length: 12 }).map((_, i) => {
   const d = subMonths(new Date(), i);
@@ -12,21 +14,46 @@ const MONTH_OPTIONS = Array.from({ length: 12 }).map((_, i) => {
 });
 
 export default function Analytics() {
+  const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
   const [month, setMonth] = useState(MONTH_OPTIONS[0].value);
   const [loading, setLoading] = useState(true);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [totalOrders, setTotalOrders] = useState(null);
 
   useEffect(() => {
     setLoading(true);
-    getAnalyticsOverview()
-      .then(setOverview)
+    Promise.all([
+      getAnalyticsOverview(),
+      fetchOrders({ page: 1, limit: 1 }),
+      getBusinessSnapshot({ month: MONTH_OPTIONS[0].value }),
+    ])
+      .then(([overview, ordersRes, snapshotRes]) => {
+        const snap = snapshotRes.data.data;
+        // Patch thisMonth with snapshot data which is more reliable
+        if (overview && snap) {
+          const revenue = snap.totalRevenue || 0;
+          const collected = snap.totalCollected || 0;
+          overview.thisMonth = {
+            ...overview.thisMonth,
+            revenue,
+            collected,
+            outstanding: revenue - collected,
+            orders: snap.deliveredOrders || overview.thisMonth?.orders || 0,
+            collectionRate: revenue > 0 ? Math.round((collected / revenue) * 100) : 0,
+          };
+        }
+        setOverview(overview);
+        setSnapshot(snap);
+        setTotalOrders(ordersRes.pagination?.total ?? ordersRes.data?.length ?? 0);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
+    if (loading) return; // skip first render, already loaded above
     setSnapshotLoading(true);
     getBusinessSnapshot({ month })
       .then(res => setSnapshot(res.data.data))
@@ -45,6 +72,33 @@ export default function Analytics() {
   const thisMonth = overview?.thisMonth || {};
   const collectionRate = thisMonth.collectionRate || 0;
 
+  // True empty state — no orders at all
+  if (totalOrders === 0) {
+    return (
+      <div className="page animate-in">
+        <div className="page-header">
+          <h1 className="page-title">Analytics</h1>
+          <p className="page-subtitle">Business performance overview</p>
+        </div>
+        <div className="empty-state card" style={{ marginTop: 24 }}>
+          <div className="empty-state-icon">
+            <BarChart2 size={22} color="var(--color-text-tertiary)" />
+          </div>
+          <p style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>No data yet</p>
+          <p style={{ fontSize: "0.875rem", marginTop: 4, textAlign: "center", maxWidth: 240 }}>
+            Create your first order to start seeing revenue trends and insights here.
+          </p>
+          <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => navigate("/orders/create")}>
+            <Plus size={15} /> Create First Order
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Has orders but none delivered yet — show data with helpful note
+  const hasDeliveredOrders = (thisMonth.revenue || 0) > 0 || (overview?.revenueTrend?.length ?? 0) > 0 || (overview?.topClients?.length ?? 0) > 0;
+
   return (
     <div className="page animate-in">
       {/* HEADER */}
@@ -53,20 +107,22 @@ export default function Analytics() {
         <p className="page-subtitle">Business performance overview</p>
       </div>
 
+
+
       {/* THIS MONTH METRICS */}
       <p className="section-label">This Month</p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-        <MetricCard label="Revenue" value={formatCurrency(thisMonth.revenue || 0)} icon={IndianRupee} color="#1D4ED8" bg="#EFF6FF" />
-        <MetricCard label="Collected" value={formatCurrency(thisMonth.collected || 0)} icon={CheckCircle} color="#15803D" bg="#F0FDF4" />
-        <MetricCard label="Outstanding" value={formatCurrency(thisMonth.outstanding || 0)} icon={TrendingUp} color="#B91C1C" bg="#FEF2F2" />
-        <MetricCard label="Orders" value={thisMonth.orders || 0} icon={BarChart2} color="#6D28D9" bg="#F5F3FF" />
+        <MetricCard label="Revenue" value={formatCurrency(thisMonth.revenue || 0)} icon={IndianRupee} iconColor="#1D4ED8" />
+        <MetricCard label="Collected" value={formatCurrency(thisMonth.collected || 0)} icon={CheckCircle} iconColor="#15803D" />
+        <MetricCard label="Outstanding" value={formatCurrency(thisMonth.outstanding || 0)} icon={TrendingUp} iconColor="#B91C1C" />
+        <MetricCard label="Orders" value={thisMonth.orders || 0} icon={BarChart2} iconColor="#6D28D9" />
       </div>
 
       {/* COLLECTION RATE */}
       <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Collection Rate</p>
-          <p className="amount" style={{ fontSize: "1.25rem", fontWeight: 700, color: collectionRate >= 80 ? "#15803D" : collectionRate >= 50 ? "#B45309" : "#B91C1C" }}>
+          <p className="amount" style={{ fontSize: "1.25rem", fontWeight: 700, color: collectionRate >= 80 ? "#15803D" : collectionRate >= 50 ? "#B45309" : collectionRate > 0 ? "#B91C1C" : "var(--color-text-tertiary)" }}>
             {collectionRate}%
           </p>
         </div>
@@ -77,6 +133,7 @@ export default function Analytics() {
             background: collectionRate >= 80 ? "#16A34A" : collectionRate >= 50 ? "#D97706" : "#DC2626",
             borderRadius: 99,
             transition: "width 0.6s ease",
+            minWidth: collectionRate > 0 ? 4 : 0,
           }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>
@@ -101,11 +158,7 @@ export default function Analytics() {
             <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Top Clients</p>
           </div>
           {overview.topClients.map((client, i) => (
-            <div key={i} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 0",
-              borderBottom: i < overview.topClients.length - 1 ? "1px solid var(--color-border)" : "none",
-            }}>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < overview.topClients.length - 1 ? "1px solid var(--color-border)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: "50%",
@@ -180,7 +233,6 @@ export default function Analytics() {
   );
 }
 
-/* ─── Revenue Bar Chart (pure CSS) ─────────────────────────────────── */
 function RevenueBars({ data }) {
   const maxRevenue = Math.max(...data.map(d => d.revenue), 1);
   return (
@@ -191,16 +243,9 @@ function RevenueBars({ data }) {
         return (
           <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <p style={{ fontSize: "0.6rem", color: isLast ? "var(--color-accent)" : "var(--color-text-tertiary)", fontFamily: "var(--font-mono)", fontWeight: isLast ? 600 : 400 }}>
-              {formatCurrency(d.revenue).replace("₹","₹")}
+              {formatCurrency(d.revenue)}
             </p>
-            <div style={{
-              width: "100%",
-              height: `${heightPct}%`,
-              background: isLast ? "var(--color-accent)" : "#E5E7EB",
-              borderRadius: "4px 4px 0 0",
-              transition: "height 0.4s ease",
-              minHeight: 4,
-            }} />
+            <div style={{ width: "100%", height: `${heightPct}%`, background: isLast ? "var(--color-accent)" : "var(--color-border)", borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: 4 }} />
             <p style={{ fontSize: "0.625rem", color: isLast ? "var(--color-accent)" : "var(--color-text-tertiary)", fontWeight: isLast ? 600 : 400 }}>
               {d.shortMonth}
             </p>
@@ -211,12 +256,12 @@ function RevenueBars({ data }) {
   );
 }
 
-function MetricCard({ label, value, icon: Icon, color, bg }) {
+function MetricCard({ label, value, icon: Icon, iconColor }) {
   return (
-    <div style={{ background: bg, borderRadius: "var(--radius-lg)", padding: "14px 16px" }}>
+    <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", padding: "14px", boxShadow: "var(--shadow-xs)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Icon size={15} color={color} />
-        <p style={{ fontSize: "0.75rem", fontWeight: 500, color }}>{label}</p>
+        <Icon size={15} color={iconColor} />
+        <p style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--color-text-tertiary)" }}>{label}</p>
       </div>
       <p className="amount" style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-text-primary)" }}>{value}</p>
     </div>

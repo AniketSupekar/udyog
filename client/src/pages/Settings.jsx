@@ -1,6 +1,6 @@
 // src/pages/Settings.jsx
 import { useState, useEffect } from "react";
-import { LogOut, Building2, Smartphone, Package, ChevronRight, Check } from "lucide-react";
+import { LogOut, Building2, Smartphone, Package, MapPin, ChevronRight, Check } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getBusinessProfile, updateBusinessProfile } from "../services/business.api";
 import { useNavigate } from "react-router-dom";
@@ -9,10 +9,11 @@ export default function Settings() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [business, setBusiness] = useState(null);
-  const [editField, setEditField] = useState(null); // which field is being edited
+  const [editField, setEditField] = useState(null);
   const [fieldValue, setFieldValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedField, setSavedField] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     getBusinessProfile().then(setBusiness).catch(console.error);
@@ -38,16 +39,15 @@ export default function Settings() {
     }
   };
 
-  const handleLogout = () => {
-    if (window.confirm("Sign out?")) logout();
-  };
+  const handleLogout = () => logout();
 
   const settingsFields = [
-    { key: "name", label: "Business Name", icon: Building2, placeholder: "Your business name", value: business?.name },
-    { key: "phone", label: "Phone Number", icon: Smartphone, placeholder: "+91 98765 43210", value: business?.phone },
-    { key: "upiId", label: "UPI ID", icon: Smartphone, placeholder: "yourname@upi", value: business?.upiId, hint: "Used in payment links sent via WhatsApp" },
-    { key: "gstNumber", label: "GST Number", icon: Building2, placeholder: "22AAAAA0000A1Z5", value: business?.gstNumber },
-    { key: "invoicePrefix", label: "Invoice Prefix", icon: Building2, placeholder: "ORD", value: business?.invoicePrefix, hint: "e.g. ORD → ORD-001, INV → INV-001" },
+    { key: "name",          label: "Business Name",  icon: Building2,  placeholder: "Your business name",    value: business?.name },
+    { key: "phone",         label: "Phone Number",   icon: Smartphone, placeholder: "+91 98765 43210",        value: business?.phone },
+    { key: "address",       label: "Address",        icon: MapPin,     placeholder: "Shop address for bills", value: business?.address },
+    { key: "upiId",         label: "UPI ID",         icon: Smartphone, placeholder: "yourname@upi",           value: business?.upiId, hint: "Used in payment links sent via WhatsApp" },
+    { key: "gstNumber",     label: "GST Number",     icon: Building2,  placeholder: "22AAAAA0000A1Z5",         value: business?.gstNumber },
+    { key: "invoicePrefix", label: "Invoice Prefix", icon: Building2,  placeholder: "ORD",                    value: business?.invoicePrefix, hint: "e.g. ORD → ORD-001" },
   ];
 
   return (
@@ -61,18 +61,20 @@ export default function Settings() {
       {/* PROFILE CARD */}
       <div className="card" style={{ padding: "20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{
-          width: 56, height: 56,
-          background: "var(--color-accent)",
+          width: 52, height: 52,
+          background: "var(--color-cta)",
           borderRadius: "50%",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "1.5rem", fontWeight: 700, color: "white", flexShrink: 0,
+          fontSize: "1.375rem", fontWeight: 700, color: "white", flexShrink: 0,
         }}>
           {user?.name?.[0]?.toUpperCase() || "A"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 700, fontSize: "1rem", color: "var(--color-text-primary)" }}>{user?.name}</p>
           <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>{user?.email}</p>
-          {business?.name && <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>{business.name}</p>}
+          {business?.name && (
+            <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>{business.name}</p>
+          )}
         </div>
       </div>
 
@@ -84,24 +86,38 @@ export default function Settings() {
             {editField === field.key ? (
               <div style={{ padding: "16px" }}>
                 <label className="section-label">{field.label}</label>
-                {field.hint && <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginBottom: 8 }}>{field.hint}</p>}
+                {field.hint && (
+                  <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginBottom: 8 }}>{field.hint}</p>
+                )}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    className="input"
-                    style={{ flex: 1 }}
-                    placeholder={field.placeholder}
-                    value={fieldValue}
-                    onChange={e => setFieldValue(e.target.value)}
-                    autoFocus
-                    onKeyDown={e => { if (e.key === "Enter") saveField(); if (e.key === "Escape") setEditField(null); }}
-                  />
+                  {field.key === "address" ? (
+                    <textarea
+                      className="input"
+                      rows={3}
+                      style={{ flex: 1 }}
+                      placeholder={field.placeholder}
+                      value={fieldValue}
+                      onChange={e => setFieldValue(e.target.value)}
+                      autoFocus
+                    />
+                  ) : (
+                    <input
+                      className="input"
+                      style={{ flex: 1 }}
+                      placeholder={field.placeholder}
+                      value={fieldValue}
+                      onChange={e => setFieldValue(e.target.value)}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === "Enter") saveField(); if (e.key === "Escape") setEditField(null); }}
+                    />
+                  )}
                   <button className="btn btn-primary btn-sm" onClick={saveField} disabled={saving} style={{ flexShrink: 0 }}>
                     {saving ? "…" : <Check size={15} />}
                   </button>
                   <button className="btn btn-secondary btn-sm" onClick={() => setEditField(null)} style={{ flexShrink: 0 }}>✕</button>
                 </div>
                 {savedField === field.key && (
-                  <p style={{ fontSize: "0.75rem", color: "var(--color-accent)", marginTop: 6, fontWeight: 500 }}>✓ Saved</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--color-success)", marginTop: 6, fontWeight: 500 }}>✓ Saved</p>
                 )}
               </div>
             ) : (
@@ -111,13 +127,13 @@ export default function Settings() {
                 onMouseEnter={e => e.currentTarget.style.background = "var(--color-bg)"}
                 onMouseLeave={e => e.currentTarget.style.background = ""}
               >
-                <div style={{ width: 38, height: 38, background: "var(--color-accent-light)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 }}>
-                  <field.icon size={17} color="var(--color-accent)" />
+                <div style={{ width: 36, height: 36, background: "var(--color-accent-light)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 }}>
+                  <field.icon size={16} color="var(--color-accent)" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--color-text-primary)" }}>{field.label}</p>
                   <p style={{ fontSize: "0.8125rem", color: field.value ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {field.value || `Add ${field.label.toLowerCase()}`}
+                    {field.value || `Tap to add ${field.label.toLowerCase()}`}
                   </p>
                 </div>
                 <ChevronRight size={16} color="var(--color-text-tertiary)" />
@@ -127,7 +143,7 @@ export default function Settings() {
         ))}
       </div>
 
-      {/* PRODUCT CATALOG LINK */}
+      {/* QUICK ACTIONS */}
       <p className="section-label">Quick Actions</p>
       <div className="card" style={{ marginBottom: 24, overflow: "hidden" }}>
         <div
@@ -136,8 +152,8 @@ export default function Settings() {
           onMouseEnter={e => e.currentTarget.style.background = "var(--color-bg)"}
           onMouseLeave={e => e.currentTarget.style.background = ""}
         >
-          <div style={{ width: 38, height: 38, background: "var(--color-accent-light)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
-            <Package size={17} color="var(--color-accent)" />
+          <div style={{ width: 36, height: 36, background: "var(--color-accent-light)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+            <Package size={16} color="var(--color-accent)" />
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--color-text-primary)" }}>Product Catalog</p>
@@ -151,17 +167,9 @@ export default function Settings() {
 
       {/* LOGOUT */}
       <button
-        onClick={handleLogout}
+        onClick={() => setShowLogoutConfirm(true)}
         className="btn"
-        style={{
-          width: "100%",
-          background: "var(--color-danger-light)",
-          color: "var(--color-danger)",
-          border: "1.5px solid #FECACA",
-          justifyContent: "center",
-          gap: 10,
-          height: 52,
-        }}
+        style={{ width: "100%", background: "var(--color-danger-light)", color: "var(--color-danger)", border: "1.5px solid #FECACA", justifyContent: "center", gap: 10, height: 52 }}
       >
         <LogOut size={18} />
         Sign Out
@@ -170,6 +178,28 @@ export default function Settings() {
       <p style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 20 }}>
         Version 1.0.0
       </p>
+
+      {/* LOGOUT CONFIRM BOTTOM SHEET */}
+      {showLogoutConfirm && (
+        <div onClick={() => setShowLogoutConfirm(false)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div onClick={e => e.stopPropagation()} className="animate-in" style={{ background: "var(--color-surface)", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, padding: "20px 20px calc(24px + env(safe-area-inset-bottom, 0px))" }}>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+              <div style={{ width: 36, height: 4, background: "var(--color-border-strong)", borderRadius: 99 }} />
+            </div>
+            <div style={{ width: 44, height: 44, background: "var(--color-danger-light)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+              <LogOut size={20} color="var(--color-danger)" />
+            </div>
+            <p style={{ textAlign: "center", fontWeight: 700, fontSize: "1rem", color: "var(--color-text-primary)", marginBottom: 6 }}>Sign out?</p>
+            <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--color-text-secondary)", marginBottom: 20 }}>
+              You'll need to sign in again to access your account.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowLogoutConfirm(false)}>Cancel</button>
+              <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }} onClick={handleLogout}>Sign out</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
