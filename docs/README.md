@@ -127,7 +127,7 @@ npm start         # production
 # Client
 npm run dev       # Vite dev server
 npm run build     # production build
-npm run preview   # preview production build
+npm run preview   # preview production build...
 ```
 
 ---
