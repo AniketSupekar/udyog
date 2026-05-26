@@ -30,6 +30,9 @@ export const env = {
   APP_URL: process.env.APP_URL || "http://localhost:5173",
   GMAIL_USER: process.env.GMAIL_USER || "",
   GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD || "",
+  BREVO_USER: process.env.BREVO_USER || "",
+  BREVO_PASSWORD: process.env.BREVO_PASSWORD || "",
+  BREVO_SENDER: process.env.BREVO_SENDER || "",
   isProd,
   isDev: !isProd,
 };

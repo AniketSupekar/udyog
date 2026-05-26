@@ -2,26 +2,21 @@ import nodemailer from "nodemailer";
 import { env } from "./env.js";
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
+  host: "smtp-relay.brevo.com",
   port: 587,
   secure: false,
-  requireTLS: true,
-  family: 4,
-  tls: {
-    rejectUnauthorized: false,
-  },
   auth: {
-    user: env.GMAIL_USER,
-    pass: env.GMAIL_APP_PASSWORD,
+    user: env.BREVO_USER,
+    pass: env.BREVO_PASSWORD,
   },
-  logger: true,
-  debug: true,
 });
+
+const FROM = `"Udyog Support" <${env.BREVO_SENDER || env.BREVO_USER}>`;
 
 export const sendVerificationEmail = async ({ to, name, otp }) => {
   try {
-    await transporter.sendMail({
-      from: `"Udyog Support" <${env.GMAIL_USER}>`,
+    const info = await transporter.sendMail({
+      from: FROM,
       to,
       subject: "Verify your email address",
       html: `
@@ -43,17 +38,18 @@ export const sendVerificationEmail = async ({ to, name, otp }) => {
         </div>
       `,
     });
+    console.log(`✅ Verification email sent to ${to} — messageId: ${info.messageId}`);
     return { success: true };
   } catch (err) {
-    console.error("Email send failed:", err.message);
+    console.error(`❌ Verification email failed to ${to}:`, err.message);
     return { success: false };
   }
 };
 
 export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
   try {
-    await transporter.sendMail({
-      from: `"Udyog Support" <${env.GMAIL_USER}>`,
+    const info = await transporter.sendMail({
+      from: FROM,
       to,
       subject: "Reset your password",
       html: `
@@ -73,9 +69,10 @@ export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
         </div>
       `,
     });
+    console.log(`✅ Reset email sent to ${to} — messageId: ${info.messageId}`);
     return { success: true };
   } catch (err) {
-    console.error("Email send failed:", err.message);
+    console.error(`❌ Reset email failed to ${to}:`, err.message);
     return { success: false };
   }
 };
