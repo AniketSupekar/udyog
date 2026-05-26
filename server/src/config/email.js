@@ -3,13 +3,19 @@ import { env } from "./env.js";
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false,
+  requireTLS: true,
   family: 4,
+  tls: {
+    rejectUnauthorized: false,
+  },
   auth: {
     user: env.GMAIL_USER,
     pass: env.GMAIL_APP_PASSWORD,
   },
+  logger: true,
+  debug: true,
 });
 
 export const sendVerificationEmail = async ({ to, name, otp }) => {
