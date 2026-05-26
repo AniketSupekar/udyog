@@ -2,7 +2,10 @@ import nodemailer from "nodemailer";
 import { env } from "./env.js";
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  family: 4,
   auth: {
     user: env.GMAIL_USER,
     pass: env.GMAIL_APP_PASSWORD,
@@ -12,7 +15,7 @@ const transporter = nodemailer.createTransport({
 export const sendVerificationEmail = async ({ to, name, otp }) => {
   try {
     await transporter.sendMail({
-      from: `"udyog support" <${env.GMAIL_USER}>`,
+      from: `"Udyog Support" <${env.GMAIL_USER}>`,
       to,
       subject: "Verify your email address",
       html: `
@@ -44,7 +47,7 @@ export const sendVerificationEmail = async ({ to, name, otp }) => {
 export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
   try {
     await transporter.sendMail({
-      from: `"udyog support" <${env.GMAIL_USER}>`,
+      from: `"Udyog Support" <${env.GMAIL_USER}>`,
       to,
       subject: "Reset your password",
       html: `
