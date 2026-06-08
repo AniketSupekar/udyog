@@ -3,11 +3,10 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  withCredentials: true, // still send cookie when available
+  withCredentials: true,
 });
 
 // Request interceptor — attach token from localStorage if present
-// This is the fallback for browsers that block cross-origin cookies
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -23,7 +22,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const path = window.location.pathname;
       const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
-      if (!publicPaths.includes(path)) {
+      const isStorePath = path.startsWith("/store/");
+
+      if (!publicPaths.includes(path) && !isStorePath) {
         localStorage.removeItem("token");
         window.location.href = "/login";
       }
