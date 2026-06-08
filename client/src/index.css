@@ -495,3 +495,9 @@ textarea.input {
   background: var(--color-surface);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
+
+body:has([data-modal="true"]) {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}

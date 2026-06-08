@@ -17,6 +17,7 @@ import productRoutes     from "./modules/products/product.routes.js";
 import analyticsRoutes   from "./modules/analytics/analytics.routes.js";
 import clientRoutes      from "./modules/clients/client.routes.js";
 import payRoutes         from "./modules/pay/pay.routes.js";
+import storeRoutes       from "./modules/store/store.routes.js";
 
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { apiLimiter, authLimiter, cronLimiter } from "./middleware/rateLimiter.middleware.js";
@@ -37,6 +38,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, storefront)
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     console.warn("Blocked CORS from:", origin);
     return callback(new Error("Not allowed by CORS"));
@@ -44,10 +46,10 @@ app.use(cors({
   credentials: true,
 }));
 
-app.options("*", cors()); // ADD THIS LINE — handles all preflight requests
+app.options("*", cors());
 
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+app.use(express.json({ limit: "10mb" })); // increased for base64 image uploads
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.use("/api", apiLimiter);
 
@@ -55,7 +57,7 @@ app.get("/health", (req, res) =>
   res.json({ success: true, status: "ok", timestamp: new Date().toISOString() })
 );
 
-// ─── Routes ───────────────────────────────────────────────────────────
+// ─── Routes ───────────────────────────────────────────────────────────────
 app.use("/api/auth",          authLimiter, authRoutes);
 app.use("/api/orders",        orderRoutes);
 app.use("/api/dashboard",     dashboardRoutes);
@@ -66,8 +68,9 @@ app.use("/api/products",      productRoutes);
 app.use("/api/analytics",     analyticsRoutes);
 app.use("/api/clients",       clientRoutes);
 app.use("/api/pay",           payRoutes);
+app.use("/api/store",         storeRoutes); // public storefront + admin store settings
 
-// ─── Cron ─────────────────────────────────────────────────────────────
+// ─── Cron ─────────────────────────────────────────────────────────────────
 app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
   try {
     const businesses = await Business.find({ isActive: true }, "_id");

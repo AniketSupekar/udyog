@@ -1,14 +1,11 @@
 // src/pages/Onboarding.jsx
-// 4-step onboarding after first registration
-// Step 1: Business profile  Step 2: UPI ID  Step 3: Add Product  Step 4: Done
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { updateBusinessProfile } from "../services/business.api";
 import { createProduct } from "../services/product.api";
 import { completeOnboarding } from "../services/auth.api";
 import { useToast } from "../context/ToastContext";
-import { Building2, Smartphone, Package, CheckCircle, ArrowRight, Skip } from "lucide-react";
+import { Building2, Smartphone, Package, CheckCircle, ArrowRight } from "lucide-react";
 
 const STEPS = [
   { id: 1, label: "Business", icon: Building2 },
@@ -23,7 +20,6 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Form states
   const [profile, setProfile] = useState({ phone: "", address: "" });
   const [upiId, setUpiId] = useState("");
   const [product, setProduct] = useState({ name: "", basePrice: "", unit: "piece" });
@@ -94,7 +90,7 @@ export default function Onboarding() {
               <div style={{
                 width: 36, height: 36,
                 borderRadius: "50%",
-                background: s.id < step ? "var(--color-accent)" : s.id === step ? "#F0FDF4" : "var(--color-bg)",
+                background: s.id < step ? "var(--color-accent)" : s.id === step ? "var(--color-accent-light)" : "var(--color-bg)",
                 border: `2px solid ${s.id <= step ? "var(--color-accent)" : "var(--color-border)"}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "all 0.3s",

@@ -26,7 +26,10 @@ export const getProducts = asyncHandler(async (req, res) => {
 /* ─── POST /api/products ─────────────────────────────────────────────── */
 export const createProduct = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const { name, unit, basePrice, description } = req.body;
+  const {
+    name, unit, basePrice, description, category,
+    isPublic, trackStock, stock, minOrderQty, images,
+  } = req.body;
 
   if (!name?.trim()) throw ApiError.badRequest("Product name is required");
   if (basePrice == null || basePrice < 0) throw ApiError.badRequest("Valid price is required");
@@ -37,6 +40,12 @@ export const createProduct = asyncHandler(async (req, res) => {
     unit: unit || "piece",
     basePrice: Number(basePrice),
     description: description?.trim() || null,
+    category: category?.trim() || null,
+    isPublic: Boolean(isPublic),
+    trackStock: Boolean(trackStock),
+    stock: trackStock && stock !== "" && stock != null ? Number(stock) : null,
+    minOrderQty: Number(minOrderQty) || 1,
+    images: (images || []).slice(0, 3),
   });
 
   await delCache(CACHE_KEY(businessId));
@@ -47,7 +56,10 @@ export const createProduct = asyncHandler(async (req, res) => {
 export const updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { businessId } = req.user;
-  const { name, unit, basePrice, description } = req.body;
+  const {
+    name, unit, basePrice, description, category,
+    isPublic, isAvailable, trackStock, stock, minOrderQty, images,
+  } = req.body;
 
   const product = await Product.findOne({ _id: id, businessId });
   if (!product) throw ApiError.notFound("Product not found");
@@ -56,6 +68,20 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (unit !== undefined) product.unit = unit;
   if (basePrice !== undefined) product.basePrice = Number(basePrice);
   if (description !== undefined) product.description = description?.trim() || null;
+  if (category !== undefined) product.category = category?.trim() || null;
+  if (isPublic !== undefined) product.isPublic = Boolean(isPublic);
+  if (isAvailable !== undefined) product.isAvailable = Boolean(isAvailable);
+  if (trackStock !== undefined) product.trackStock = Boolean(trackStock);
+  if (stock !== undefined) product.stock = stock !== null && stock !== "" ? Number(stock) : null;
+  if (minOrderQty !== undefined) product.minOrderQty = Number(minOrderQty) || 1;
+
+  // Merge existing Cloudinary URLs with any new ones
+  if (images !== undefined) {
+    // Keep existing URLs from DB + any new base64 from payload
+    const existingUrls = (images || []).filter(img => img.startsWith("http"));
+    const newBase64 = (images || []).filter(img => img.startsWith("data:"));
+    product.images = [...existingUrls, ...newBase64].slice(0, 3);
+  }
 
   await product.save();
   await delCache(CACHE_KEY(businessId));

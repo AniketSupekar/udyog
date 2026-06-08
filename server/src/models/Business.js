@@ -10,7 +10,7 @@ const businessSchema = new mongoose.Schema(
       maxlength: [100, "Name too long"],
     },
     logo: {
-      type: String, // Cloudinary URL
+      type: String,
       default: null,
     },
     phone: {
@@ -53,7 +53,41 @@ const businessSchema = new mongoose.Schema(
       maxlength: 6,
     },
 
-    // Onboarding progress tracking
+    // ── Storefront ─────────────────────────────────────────────────────
+    store: {
+      slug: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: null,
+        // unique enforced via sparse index below
+      },
+      isActive: {
+        type: Boolean,
+        default: false, // off by default — admin must turn on
+      },
+      acceptingOrders: {
+        type: Boolean,
+        default: true, // can pause orders without deactivating store
+      },
+      tagline: {
+        type: String,
+        trim: true,
+        default: null, // "Quality prints, fast delivery in Pune"
+      },
+      whatsappNumber: {
+        type: String,
+        trim: true,
+        default: null, // customer support number
+      },
+      deliveryNote: {
+        type: String,
+        trim: true,
+        default: null, // "Delivery within Pune only, 2-3 days"
+      },
+    },
+
+    // ── Onboarding ─────────────────────────────────────────────────────
     onboarding: {
       profileCompleted: { type: Boolean, default: false },
       upiAdded: { type: Boolean, default: false },
@@ -82,5 +116,6 @@ const businessSchema = new mongoose.Schema(
 );
 
 businessSchema.index({ isActive: 1 });
+businessSchema.index({ "store.slug": 1 }, { unique: true, sparse: true }); // sparse = nulls not indexed
 
 export default mongoose.model("Business", businessSchema);

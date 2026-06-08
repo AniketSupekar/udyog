@@ -8,7 +8,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-// import Onboarding from "./pages/Onboarding";
+import Storefront from "./pages/Storefront";
+import StoreOrderConfirm from "./pages/StoreOrderConfirm";
 
 // Protected pages
 import Dashboard from "./pages/Dashboard";
@@ -21,6 +22,7 @@ import ClientDetails from "./pages/ClientDetails";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Products from "./pages/Products";
+import Onboarding from "./pages/Onboarding";
 
 function App() {
   const { user, loading } = useAuth();
@@ -51,14 +53,18 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ── Public routes ── */}
+        {/* ── Public store routes — no auth needed ── */}
+        <Route path="/store/:slug" element={<Storefront />} />
+        <Route path="/store/:slug/order/:orderId" element={<StoreOrderConfirm />} />
+
+        {/* ── Auth routes ── */}
         <Route path="/login"           element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/register"        element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
-        {/* <Route path="/onboarding"      element={user ? <Onboarding /> : <Navigate to="/login" replace />} /> */}
 
-        {/* ── Protected routes (inside Layout) ── */}
+        {/* ── Protected routes ── */}
+        <Route path="/onboarding" element={user ? <Onboarding /> : <Navigate to="/login" replace />} />
         <Route path="/" element={user ? <Layout /> : <Navigate to="/login" replace />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"        element={<Dashboard />} />

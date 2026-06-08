@@ -30,6 +30,45 @@ const productSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
+    category: {
+      type: String,
+      trim: true,
+      default: null, // free text tag — "Plants", "Pots", "T-shirts" etc.
+    },
+
+    // ── Storefront fields ──────────────────────────────────────────────
+    isPublic: {
+      type: Boolean,
+      default: false, // must explicitly publish to storefront
+    },
+    images: {
+      type: [String], // Cloudinary URLs, max 3
+      default: [],
+      validate: {
+        validator: (v) => v.length <= 3,
+        message: "Maximum 3 images per product",
+      },
+    },
+    isAvailable: {
+      type: Boolean,
+      default: true, // temporarily mark unavailable without deleting
+    },
+    trackStock: {
+      type: Boolean,
+      default: false,
+    },
+    stock: {
+      type: Number,
+      default: null, // null = unlimited (only used when trackStock is true)
+      min: [0, "Stock cannot be negative"],
+    },
+    minOrderQty: {
+      type: Number,
+      default: 1,
+      min: [1, "Minimum order quantity must be at least 1"],
+    },
+
+    // ── Internal ───────────────────────────────────────────────────────
     isActive: {
       type: Boolean,
       default: true,
@@ -43,7 +82,7 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.index({ businessId: 1, isActive: 1, name: 1 });
-// Ensure no duplicate product names per business
 productSchema.index({ businessId: 1, name: 1 }, { unique: true });
+productSchema.index({ businessId: 1, isPublic: 1, isAvailable: 1 }); // storefront query
 
 export default mongoose.model("Product", productSchema);
