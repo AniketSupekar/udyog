@@ -5,7 +5,6 @@ import { getCache, setCache } from "../../config/redis.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { sendSuccess } from "../../utils/ApiResponse.js";
 
-// ─── Date range helpers ────────────────────────────────────────────────────────
 const getDateRanges = () => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -20,16 +19,14 @@ const getDateRanges = () => {
   return { todayStart, todayEnd, upcomingEnd };
 };
 
-// ─── Shared list query ─────────────────────────────────────────────────────────
 const findOrderList = (query) =>
   Order.find(query)
     .sort({ deliveryDate: 1, createdAt: -1 })
     .limit(15)
-    .select("clientSnapshot financial payment status deliveryDate orderDate createdAt notes")
+    .select("clientSnapshot financial payment status deliveryDate orderDate createdAt notes source")
     .lean();
 
 /* ─── GET /api/dashboard/full ──────────────────────────────────────────────── */
-// Single endpoint — frontend calls this once on mount
 export const getFullDashboard = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
@@ -71,18 +68,16 @@ export const getBusinessSnapshot = asyncHandler(async (req, res) => {
   const { startDate, endDate, month } = req.query;
   const { businessId } = req.user;
 
-  // If custom range requested — skip cache, compute fresh
   if (startDate || endDate || month) {
     const snapshot = await computeSnapshot(businessId, startDate, endDate, month);
     return sendSuccess(res, snapshot);
   }
 
-  // Current month — use cache
   const snapshot = await getBusinessSnapshotForTenant(businessId);
   sendSuccess(res, snapshot);
 });
 
-/* ─── TENANT-SCOPED HELPERS (also used by notification service) ────────────── */
+/* ─── TENANT-SCOPED HELPERS ────────────────────────────────────────────────── */
 
 export const getDashboardSummaryForTenant = async (businessId) => {
   const cacheKey = `dashboard:summary:${businessId}`;
@@ -91,7 +86,7 @@ export const getDashboardSummaryForTenant = async (businessId) => {
 
   const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
 
-  const [dueToday, overdue, upcoming, pending, totalOutstanding] = await Promise.all([
+  const [dueToday, overdue, upcoming, pending, totalOutstanding, storefrontNew] = await Promise.all([
     Order.countDocuments({
       businessId,
       deliveryDate: { $gte: todayStart, $lte: todayEnd },
@@ -115,7 +110,6 @@ export const getDashboardSummaryForTenant = async (businessId) => {
       status: "PENDING",
       isDeleted: false,
     }),
-    // Outstanding amount — sum of all remaining payments
     Order.aggregate([
       {
         $match: {
@@ -125,13 +119,15 @@ export const getDashboardSummaryForTenant = async (businessId) => {
           isDeleted: false,
         },
       },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$payment.remainingAmount" },
-        },
-      },
+      { $group: { _id: null, total: { $sum: "$payment.remainingAmount" } } },
     ]),
+    // NEW — storefront orders that are still CREATED (not yet reviewed by admin)
+    Order.countDocuments({
+      businessId,
+      source: "STOREFRONT",
+      status: "CREATED",
+      isDeleted: false,
+    }),
   ]);
 
   const data = {
@@ -140,6 +136,7 @@ export const getDashboardSummaryForTenant = async (businessId) => {
     upcoming,
     pending,
     totalOutstanding: totalOutstanding[0]?.total || 0,
+    storefrontNew, // NEW
   };
 
   await setCache(cacheKey, data, 30);
@@ -156,7 +153,6 @@ export const getBusinessSnapshotForTenant = async (businessId) => {
   return snapshot;
 };
 
-// ─── Internal: compute snapshot for any date range ────────────────────────────
 const computeSnapshot = async (businessId, startDate, endDate, month) => {
   let start, end;
 

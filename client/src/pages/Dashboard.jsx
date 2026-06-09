@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { formatCurrency } from "../utils/currency.util";
 import { formatDate } from "../utils/date.util";
 import StatusBadge from "../components/StatusBadge";
-import { AlertTriangle, Clock, Calendar, Hourglass, ChevronRight, IndianRupee } from "lucide-react";
+import { AlertTriangle, Clock, Calendar, Hourglass, ChevronRight, IndianRupee, Store } from "lucide-react";
 import NotificationBell from "../components/notifications/NotificationBell";
 
 export default function Dashboard() {
@@ -38,21 +38,15 @@ export default function Dashboard() {
     <>
       {/* STICKY NAVBAR HEADER */}
       <div style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 30,
+        position: "sticky", top: 0, zIndex: 30,
         background: "var(--color-surface)",
         borderBottom: "1px solid var(--color-border)",
         borderRadius: "0 0 var(--radius-xl) var(--radius-xl)",
         padding: "12px var(--page-padding)",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <div>
-          <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>
-            {greeting()},
-          </p>
+          <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>{greeting()},</p>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
             {user?.name?.split(" ")[0] || "Admin"} 👋
           </h1>
@@ -68,9 +62,9 @@ export default function Dashboard() {
             onClick={() => navigate("/outstanding")}
             style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              background: "#FEF2F2",
-              border: "1px solid #FECACA", borderRadius: "var(--radius-lg)", padding: "14px 16px",
-              marginBottom: 20, cursor: "pointer", transition: "all 0.15s",
+              background: "#FEF2F2", border: "1px solid #FECACA",
+              borderRadius: "var(--radius-lg)", padding: "14px 16px",
+              marginBottom: 12, cursor: "pointer", transition: "all 0.15s",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -87,6 +81,39 @@ export default function Dashboard() {
             <ChevronRight size={18} color="var(--color-danger)" />
           </button>
         )}
+
+        {/* STOREFRONT ORDERS BANNER */}
+        {summary?.storefrontNew > 0 && (
+          <button
+            onClick={() => navigate("/orders?source=STOREFRONT")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: "var(--color-accent-light)", border: "1.5px solid var(--color-accent)",
+              borderRadius: "var(--radius-lg)", padding: "14px 16px",
+              marginBottom: 12, cursor: "pointer", transition: "all 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = ""}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, background: "var(--color-accent)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Store size={18} color="white" />
+              </div>
+              <div style={{ textAlign: "left" }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--color-accent)", fontWeight: 500 }}>New Store Orders</p>
+                <p style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-accent)", fontFamily: "var(--font-mono)" }}>
+                  {summary.storefrontNew} order{summary.storefrontNew > 1 ? "s" : ""} to review
+                </p>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 8, height: 8, background: "var(--color-accent)", borderRadius: "50%", animation: "pulse 2s infinite" }} />
+              <ChevronRight size={18} color="var(--color-accent)" />
+            </div>
+          </button>
+        )}
+
+        <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.4)} }`}</style>
 
         {/* SUMMARY CARDS */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
@@ -112,7 +139,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* ORDER LISTS */}
+        {/* ORDER SECTIONS */}
         {overdue?.length > 0 && (
           <OrderSection title="Overdue" icon={<AlertTriangle size={15} color="var(--color-danger)" />} titleColor="var(--color-danger)" orders={overdue} viewAllPath="/orders?filter=overdue" navigate={navigate} />
         )}
@@ -141,14 +168,9 @@ function SummaryCard({ label, value, icon: Icon, iconColor, pill, pillBg, pillCo
     <button
       onClick={onClick}
       style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-lg)",
-        padding: "14px",
-        textAlign: "left",
-        cursor: "pointer",
-        transition: "all 0.15s",
-        boxShadow: "var(--shadow-xs)",
+        background: "var(--color-surface)", border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-lg)", padding: "14px", textAlign: "left",
+        cursor: "pointer", transition: "all 0.15s", boxShadow: "var(--shadow-xs)",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "var(--shadow-xs)"; }}
@@ -188,10 +210,17 @@ function OrderSection({ title, icon, titleColor, orders, viewAllPath, navigate }
             onMouseLeave={e => e.currentTarget.style.boxShadow = ""}
           >
             <div style={{ textAlign: "left", minWidth: 0, flex: 1 }}>
-              <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {order.clientSnapshot?.name}
-              </p>
-              <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 3 }}>{formatDate(order.deliveryDate)}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {order.clientSnapshot?.name}
+                </p>
+                {order.source === "STOREFRONT" && (
+                  <span style={{ flexShrink: 0, fontSize: "0.5625rem", fontWeight: 700, background: "var(--color-accent-light)", color: "var(--color-accent)", padding: "1px 5px", borderRadius: 3, border: "1px solid #C7D2FE" }}>
+                    STORE
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)" }}>{formatDate(order.deliveryDate)}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <StatusBadge status={order.status} />

@@ -7,7 +7,6 @@ import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendCreated, sendPaginated } from "../../utils/ApiResponse.js";
 import { calculateOrderTotals, getPaymentStatus } from "../../utils/calculations.js";
 
-// ─── Cache key helpers ─────────────────────────────────────────────────────────
 const invalidateOrderCache = async (businessId) => {
   await Promise.all([
     delCache(`dashboard:*:${businessId}`),
@@ -15,7 +14,6 @@ const invalidateOrderCache = async (businessId) => {
   ]);
 };
 
-// ─── Status transition rules ──────────────────────────────────────────────────
 const STATUS_TRANSITIONS = {
   CREATED: ["PENDING", "CANCELLED"],
   PENDING: ["DELIVERED", "CANCELLED"],
@@ -27,17 +25,16 @@ const STATUS_TRANSITIONS = {
 export const createOrder = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const {
-    clientSnapshot,   // { name, phone, address, email }
-    clientId,         // optional — link to Client doc
+    clientSnapshot,
+    clientId,
     orderDate,
     deliveryDate,
-    items,            // [{ productName, quantity, unit, unitPrice }]
-    financial,        // { discountType, discountValue, taxType, taxRate }
+    items,
+    financial,
     advancePaid = 0,
     notes,
   } = req.body;
 
-  // ── Validate required fields ──
   if (!clientSnapshot?.name || !clientSnapshot?.phone) {
     throw ApiError.badRequest("Customer name and phone are required", "MISSING_CLIENT");
   }
@@ -48,34 +45,24 @@ export const createOrder = asyncHandler(async (req, res) => {
     throw ApiError.badRequest("Order must have at least one item", "MISSING_ITEMS");
   }
 
-  // ── Validate each line item ──
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (!item.productName?.trim()) {
-      throw ApiError.badRequest(`Item ${i + 1}: product name is required`, "INVALID_ITEM");
-    }
-    if (!item.quantity || item.quantity <= 0) {
-      throw ApiError.badRequest(`Item ${i + 1}: quantity must be greater than 0`, "INVALID_ITEM");
-    }
-    if (item.unitPrice == null || item.unitPrice < 0) {
-      throw ApiError.badRequest(`Item ${i + 1}: unit price must be 0 or greater`, "INVALID_ITEM");
-    }
+    if (!item.productName?.trim()) throw ApiError.badRequest(`Item ${i + 1}: product name is required`, "INVALID_ITEM");
+    if (!item.quantity || item.quantity <= 0) throw ApiError.badRequest(`Item ${i + 1}: quantity must be greater than 0`, "INVALID_ITEM");
+    if (item.unitPrice == null || item.unitPrice < 0) throw ApiError.badRequest(`Item ${i + 1}: unit price must be 0 or greater`, "INVALID_ITEM");
   }
 
-  // ── Validate dates ──
   const oDate = new Date(orderDate);
   const dDate = new Date(deliveryDate);
   if (isNaN(oDate.getTime()) || isNaN(dDate.getTime())) {
     throw ApiError.badRequest("Invalid date format", "INVALID_DATE");
   }
 
-  // ── Calculate line item amounts ──
   const computedItems = items.map((item) => ({
     ...item,
     amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
   }));
 
-  // ── Calculate order totals ──
   const { subtotal, discountAmount, taxAmount, total } = calculateOrderTotals(
     computedItems,
     { type: financial?.discountType || "NONE", value: financial?.discountValue || 0 },
@@ -132,6 +119,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
     status,
     paymentStatus,
     filter,
+    source,           // NEW — "STOREFRONT" | "ADMIN"
     showDeleted = "false",
   } = req.query;
 
@@ -139,13 +127,12 @@ export const getAllOrders = asyncHandler(async (req, res) => {
   if (showDeleted !== "true") query.isDeleted = false;
   if (status) query.status = status;
   if (paymentStatus) query["payment.status"] = paymentStatus;
+  if (source) query.source = source;  // NEW — filter by source
 
-  // Search by customer name
   if (search.trim()) {
     query["clientSnapshot.name"] = { $regex: search.trim(), $options: "i" };
   }
 
-  // Date filters
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const endOfToday = new Date();
@@ -166,7 +153,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
 
   const [orders, total] = await Promise.all([
     Order.find(query)
-      .sort({ deliveryDate: 1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
       .lean(),
@@ -201,7 +188,6 @@ export const getOrderById = asyncHandler(async (req, res) => {
 /* ─── PATCH /api/orders/:id/status ────────────────────────────────────────── */
 export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
-
   if (!status) throw ApiError.badRequest("Status is required", "MISSING_STATUS");
 
   const order = await Order.findOne({
@@ -214,10 +200,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
   const allowed = STATUS_TRANSITIONS[order.status];
   if (!allowed?.includes(status)) {
-    throw ApiError.badRequest(
-      `Cannot transition from ${order.status} to ${status}`,
-      "INVALID_STATUS_TRANSITION"
-    );
+    throw ApiError.badRequest(`Cannot transition from ${order.status} to ${status}`, "INVALID_STATUS_TRANSITION");
   }
 
   order.status = status;
@@ -245,7 +228,6 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
   if (deliveryDate) order.deliveryDate = new Date(deliveryDate);
   if (notes !== undefined) order.notes = notes;
 
-  // If items updated — recalculate everything
   if (items && Array.isArray(items) && items.length > 0) {
     const computedItems = items.map((item) => ({
       ...item,
@@ -308,7 +290,6 @@ export const recordPayment = asyncHandler(async (req, res) => {
     );
   }
 
-  // Add transaction
   order.payment.transactions.push({
     amount: roundedAmount,
     method,
@@ -317,7 +298,6 @@ export const recordPayment = asyncHandler(async (req, res) => {
     recordedAt: new Date(),
   });
 
-  // Update totals
   order.payment.totalPaid = Math.round((order.payment.totalPaid + roundedAmount) * 100) / 100;
   order.payment.remainingAmount = Math.round((order.payment.remainingAmount - roundedAmount) * 100) / 100;
   order.payment.status = getPaymentStatus(order.financial.total, order.payment.totalPaid);

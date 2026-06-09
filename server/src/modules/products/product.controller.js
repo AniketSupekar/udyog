@@ -6,12 +6,11 @@ import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendCreated } from "../../utils/ApiResponse.js";
 
 const CACHE_KEY = (businessId) => `products:${businessId}`;
-const CACHE_TTL = 300; // 5 minutes
+const CACHE_TTL = 300;
 
 /* ─── GET /api/products ──────────────────────────────────────────────── */
 export const getProducts = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-
   const cached = await getCache(CACHE_KEY(businessId));
   if (cached) return sendSuccess(res, cached);
 
@@ -27,7 +26,7 @@ export const getProducts = asyncHandler(async (req, res) => {
 export const createProduct = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const {
-    name, unit, basePrice, description, category,
+    name, unit, basePrice, costPrice, description, category,
     isPublic, trackStock, stock, minOrderQty, images,
   } = req.body;
 
@@ -39,6 +38,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     name: name.trim(),
     unit: unit || "piece",
     basePrice: Number(basePrice),
+    costPrice: costPrice !== undefined && costPrice !== "" ? Number(costPrice) : null,
     description: description?.trim() || null,
     category: category?.trim() || null,
     isPublic: Boolean(isPublic),
@@ -57,7 +57,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { businessId } = req.user;
   const {
-    name, unit, basePrice, description, category,
+    name, unit, basePrice, costPrice, description, category,
     isPublic, isAvailable, trackStock, stock, minOrderQty, images,
   } = req.body;
 
@@ -67,6 +67,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (name !== undefined) product.name = name.trim();
   if (unit !== undefined) product.unit = unit;
   if (basePrice !== undefined) product.basePrice = Number(basePrice);
+  if (costPrice !== undefined) product.costPrice = costPrice !== "" && costPrice !== null ? Number(costPrice) : null;
   if (description !== undefined) product.description = description?.trim() || null;
   if (category !== undefined) product.category = category?.trim() || null;
   if (isPublic !== undefined) product.isPublic = Boolean(isPublic);
@@ -75,9 +76,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (stock !== undefined) product.stock = stock !== null && stock !== "" ? Number(stock) : null;
   if (minOrderQty !== undefined) product.minOrderQty = Number(minOrderQty) || 1;
 
-  // Merge existing Cloudinary URLs with any new ones
   if (images !== undefined) {
-    // Keep existing URLs from DB + any new base64 from payload
     const existingUrls = (images || []).filter(img => img.startsWith("http"));
     const newBase64 = (images || []).filter(img => img.startsWith("data:"));
     product.images = [...existingUrls, ...newBase64].slice(0, 3);
@@ -85,7 +84,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
   await product.save();
   await delCache(CACHE_KEY(businessId));
-
   sendSuccess(res, product, "Product updated");
 });
 

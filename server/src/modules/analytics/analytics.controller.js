@@ -1,12 +1,12 @@
 // src/modules/analytics/analytics.controller.js
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
+import Product from "../../models/Product.js";
 import { getCache, setCache } from "../../config/redis.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { sendSuccess } from "../../utils/ApiResponse.js";
 
 /* ─── GET /api/analytics/overview ───────────────────────────────────── */
-// Revenue trend (last 6 months) + top clients + payment breakdown
 export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const cacheKey = `analytics:overview:${businessId}`;
@@ -14,14 +14,14 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const cached = await getCache(cacheKey);
   if (cached) return sendSuccess(res, cached);
 
-  // Build last 6 months date range
   const now = new Date();
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  const [revenueTrend, topClients, paymentBreakdown, collectionSummary] =
+  const [revenueTrend, topClients, paymentBreakdown, collectionSummary, products] =
     await Promise.all([
-
-      // 1. Monthly revenue trend (last 6 months)
+      // Monthly revenue trend — delivered orders
       Order.aggregate([
         {
           $match: {
@@ -33,10 +33,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         },
         {
           $group: {
-            _id: {
-              year: { $year: "$deliveryDate" },
-              month: { $month: "$deliveryDate" },
-            },
+            _id: { year: { $year: "$deliveryDate" }, month: { $month: "$deliveryDate" } },
             revenue: { $sum: "$financial.total" },
             collected: { $sum: "$payment.totalPaid" },
             orders: { $sum: 1 },
@@ -45,7 +42,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
-      // 2. Top 5 clients by revenue (all time)
+      // Top 5 clients by revenue
       Order.aggregate([
         {
           $match: {
@@ -66,7 +63,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         { $limit: 5 },
       ]),
 
-      // 3. Payment method breakdown (current month)
+      // Payment method breakdown
       Order.aggregate([
         {
           $match: {
@@ -85,16 +82,13 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         { $sort: { total: -1 } },
       ]),
 
-      // 4. Collection summary (current month)
+      // This month delivered summary
       Order.aggregate([
         {
           $match: {
             businessId: new mongoose.Types.ObjectId(businessId),
             status: "DELIVERED",
-            deliveryDate: {
-              $gte: new Date(now.getFullYear(), now.getMonth(), 1),
-              $lte: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
-            },
+            deliveryDate: { $gte: monthStart, $lte: monthEnd },
             isDeleted: false,
           },
         },
@@ -104,12 +98,56 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
             totalRevenue: { $sum: "$financial.total" },
             totalCollected: { $sum: "$payment.totalPaid" },
             totalOrders: { $sum: 1 },
+            // unwind items to calculate cost
+            items: { $push: "$items" },
           },
         },
       ]),
+
+      // All active products with costPrice set
+      Product.find({
+        businessId,
+        isActive: true,
+        costPrice: { $ne: null, $gt: 0 },
+      }).select("name basePrice costPrice").lean(),
     ]);
 
-  // Format revenue trend with month labels
+  // Build product cost map: productName -> costPrice/basePrice ratio
+  // We'll use this to estimate cost from order line items
+  const productCostMap = {};
+  products.forEach(p => {
+    productCostMap[p.name.toLowerCase()] = {
+      basePrice: p.basePrice,
+      costPrice: p.costPrice,
+    };
+  });
+
+  // Calculate profit for this month's delivered orders
+  // by looking up cost price for each line item
+  const thisMonthOrders = await Order.find({
+    businessId,
+    status: "DELIVERED",
+    deliveryDate: { $gte: monthStart, $lte: monthEnd },
+    isDeleted: false,
+  }).select("items financial").lean();
+
+  let totalCost = 0;
+  let itemsWithCost = 0;
+  let itemsWithoutCost = 0;
+
+  thisMonthOrders.forEach(order => {
+    order.items.forEach(item => {
+      const key = item.productName?.toLowerCase();
+      const product = productCostMap[key];
+      if (product && product.costPrice) {
+        totalCost += product.costPrice * item.quantity;
+        itemsWithCost++;
+      } else {
+        itemsWithoutCost++;
+      }
+    });
+  });
+
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const formattedTrend = revenueTrend.map((m) => ({
     month: `${MONTHS[m._id.month - 1]} ${m._id.year}`,
@@ -120,9 +158,14 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   }));
 
   const summary = collectionSummary[0] || { totalRevenue: 0, totalCollected: 0, totalOrders: 0 };
-  const collectionRate = summary.totalRevenue > 0
-    ? Math.round((summary.totalCollected / summary.totalRevenue) * 100)
+  const revenue = Math.round(summary.totalRevenue);
+  const cost = Math.round(totalCost);
+  const profit = revenue - cost;
+  const profitMargin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
+  const collectionRate = revenue > 0
+    ? Math.round((summary.totalCollected / revenue) * 100)
     : 0;
+  const hasCostData = products.length > 0;
 
   const data = {
     revenueTrend: formattedTrend,
@@ -138,14 +181,19 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       count: p.count,
     })),
     thisMonth: {
-      revenue: Math.round(summary.totalRevenue),
+      revenue,
       collected: Math.round(summary.totalCollected),
-      outstanding: Math.round(summary.totalRevenue - summary.totalCollected),
+      outstanding: Math.round(revenue - summary.totalCollected),
       orders: summary.totalOrders,
       collectionRate,
+      cost,
+      profit,
+      profitMargin,
+      hasCostData,
+      partialCostData: itemsWithoutCost > 0 && itemsWithCost > 0,
     },
   };
 
-  await setCache(cacheKey, data, 300); // 5 min cache
+  await setCache(cacheKey, data, 300);
   sendSuccess(res, data);
 });

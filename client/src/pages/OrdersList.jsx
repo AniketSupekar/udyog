@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { fetchOrders } from "../services/order.api";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
-import { Search, Plus, X, SlidersHorizontal, Phone } from "lucide-react";
+import { Search, Plus, X, SlidersHorizontal, Phone, Store } from "lucide-react";
 import { formatDate } from "../utils/date.util";
 import { formatCurrency } from "../utils/currency.util";
 
@@ -29,6 +29,8 @@ export default function OrdersList() {
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
+  const [sourceTab, setSourceTab] = useState("ALL"); // "ALL" | "STOREFRONT"
+  const [storefrontCount, setStorefrontCount] = useState(null);
   const debounceRef = useRef(null);
 
   const isDashboardView = Boolean(filter || status);
@@ -46,16 +48,30 @@ export default function OrdersList() {
 
   useEffect(() => {
     setLoading(true);
-    fetchOrders({ page, limit: 15, search: debouncedSearch, status, filter })
+    const source = sourceTab === "STOREFRONT" ? "STOREFRONT" : undefined;
+    fetchOrders({ page, limit: 15, search: debouncedSearch, status, filter, source })
       .then(res => { setOrders(res.data || []); setPagination(res.pagination); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [debouncedSearch, status, filter, page]);
+  }, [debouncedSearch, status, filter, page, sourceTab]);
+
+  // Fetch storefront count badge once on mount
+  useEffect(() => {
+    fetchOrders({ page: 1, limit: 1, source: "STOREFRONT", status: "CREATED" })
+      .then(res => setStorefrontCount(res.pagination?.total || 0))
+      .catch(() => {});
+  }, []);
+
+  const handleTabChange = (tab) => {
+    setSourceTab(tab);
+    setPage(1);
+    setSearch("");
+  };
 
   return (
     <div className="page animate-in">
       {/* HEADER */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 16 }}>
         {isDashboardView && (
           <button onClick={() => navigate(-1)} style={{ fontSize: "0.8125rem", color: "var(--color-accent)", marginBottom: 8, display: "block", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
             ← Back
@@ -64,7 +80,9 @@ export default function OrdersList() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h1 className="page-title">{contextTitle || "Orders"}</h1>
-            <p className="page-subtitle">{orders.length > 0 ? `${pagination?.total || orders.length} total orders` : "Manage all customer orders"}</p>
+            <p className="page-subtitle">
+              {pagination?.total != null ? `${pagination.total} order${pagination.total !== 1 ? "s" : ""}` : "Manage all customer orders"}
+            </p>
           </div>
           {!isDashboardView && (
             <Link to="/orders/create" className="btn btn-primary btn-sm">
@@ -74,7 +92,65 @@ export default function OrdersList() {
         </div>
       </div>
 
-      {/* SEARCH */}
+      {/* SOURCE TABS — only show when not in dashboard filter view */}
+      {!isDashboardView && (
+        <div style={{ display: "flex", gap: 0, marginBottom: 14, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: 3, width: "fit-content" }}>
+          <button
+            onClick={() => handleTabChange("ALL")}
+            style={{
+              padding: "6px 14px",
+              fontSize: "0.8125rem",
+              fontWeight: sourceTab === "ALL" ? 600 : 400,
+              color: sourceTab === "ALL" ? "white" : "var(--color-text-secondary)",
+              background: sourceTab === "ALL" ? "var(--color-cta)" : "transparent",
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            All Orders
+          </button>
+          <button
+            onClick={() => handleTabChange("STOREFRONT")}
+            style={{
+              padding: "6px 14px",
+              fontSize: "0.8125rem",
+              fontWeight: sourceTab === "STOREFRONT" ? 600 : 400,
+              color: sourceTab === "STOREFRONT" ? "white" : "var(--color-text-secondary)",
+              background: sourceTab === "STOREFRONT" ? "var(--color-accent)" : "transparent",
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              transition: "all 0.15s",
+              fontFamily: "var(--font-sans)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Store size={13} />
+            Store Orders
+            {storefrontCount > 0 && (
+              <span style={{
+                background: sourceTab === "STOREFRONT" ? "rgba(255,255,255,0.25)" : "var(--color-accent)",
+                color: "white",
+                fontSize: "0.625rem",
+                fontWeight: 700,
+                padding: "1px 5px",
+                borderRadius: 99,
+                minWidth: 16,
+                textAlign: "center",
+              }}>
+                {storefrontCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* SEARCH + FILTER */}
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
         <div style={{ position: "relative", flex: 1 }}>
           <Search size={16} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-tertiary)" }} />
@@ -140,14 +216,19 @@ export default function OrdersList() {
           <div className="empty-state-icon">
             <Search size={20} color="var(--color-text-tertiary)" />
           </div>
-          <p style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>No orders found</p>
-          <p style={{ fontSize: "0.875rem", marginTop: 4 }}>Try adjusting your search or filters</p>
+          <p style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
+            {sourceTab === "STOREFRONT" ? "No store orders yet" : "No orders found"}
+          </p>
+          <p style={{ fontSize: "0.875rem", marginTop: 4 }}>
+            {sourceTab === "STOREFRONT" ? "Orders from your public storefront will appear here" : "Try adjusting your search or filters"}
+          </p>
         </div>
       ) : (
         <>
           <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {orders.map(order => {
               const borderColor = STATUS_BORDER[order.status] || "var(--color-border-strong)";
+              const isStorefront = order.source === "STOREFRONT";
               return (
                 <Link key={order._id} to={`/orders/${order._id}`} style={{ textDecoration: "none" }}>
                   <div
@@ -165,10 +246,26 @@ export default function OrdersList() {
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {order.clientSnapshot?.name}
-                        </p>
-                        <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {order.clientSnapshot?.name}
+                          </p>
+                          {isStorefront && (
+                            <span style={{
+                              flexShrink: 0,
+                              display: "inline-flex", alignItems: "center", gap: 3,
+                              fontSize: "0.5625rem", fontWeight: 700,
+                              background: "var(--color-accent-light)",
+                              color: "var(--color-accent)",
+                              padding: "2px 6px", borderRadius: 4,
+                              letterSpacing: "0.03em",
+                              border: "1px solid #C7D2FE",
+                            }}>
+                              <Store size={9} /> STORE
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
                           <Phone size={11} /> {order.clientSnapshot?.phone}
                         </p>
                       </div>
@@ -178,7 +275,9 @@ export default function OrdersList() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                       <div>
                         <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Delivery</p>
-                        <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-primary)" }}>{formatDate(order.deliveryDate)}</p>
+                        <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-primary)" }}>
+                          {order.deliveryDate ? formatDate(order.deliveryDate) : "—"}
+                        </p>
                       </div>
                       <div>
                         <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Total</p>
@@ -196,6 +295,7 @@ export default function OrdersList() {
               );
             })}
           </div>
+
           {pagination?.totalPages > 1 && (
             <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 20, alignItems: "center" }}>
               <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
@@ -214,13 +314,10 @@ export default function OrdersList() {
             position: "fixed",
             bottom: "calc(64px + env(safe-area-inset-bottom, 0px) + 8px)",
             right: 24,
-            width: 52,
-            height: 52,
+            width: 52, height: 52,
             background: "var(--color-cta)",
             borderRadius: "var(--radius-full)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
             textDecoration: "none",
             zIndex: 40,

@@ -120,6 +120,9 @@ export default function Products() {
                   </div>
                   <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>
                     <span className="amount">{formatCurrency(product.basePrice)}</span> / {product.unit}
+                    {product.costPrice > 0 && (
+                      <span style={{ color: "var(--color-text-tertiary)" }}> · cost {formatCurrency(product.costPrice)}</span>
+                    )}
                     {product.category && <span style={{ color: "var(--color-text-tertiary)" }}> · {product.category}</span>}
                   </p>
                 </div>
@@ -152,7 +155,6 @@ export default function Products() {
         )}
       </div>
 
-      {/* DELETE CONFIRM — rendered in body via portal */}
       {deleteConfirm && createPortal(
         <div
           data-modal="true"
@@ -177,7 +179,6 @@ export default function Products() {
         document.body
       )}
 
-      {/* PRODUCT FORM — rendered in body via portal */}
       {showForm && createPortal(
         <ProductFormModal
           product={editingProduct}
@@ -199,6 +200,7 @@ function ProductFormModal({ product, onClose, onSaved }) {
     name: product?.name || "",
     unit: product?.unit || "piece",
     basePrice: product?.basePrice ?? "",
+    costPrice: product?.costPrice ?? "",
     description: product?.description || "",
     category: product?.category || "",
     minOrderQty: product?.minOrderQty || 1,
@@ -241,13 +243,17 @@ function ProductFormModal({ product, onClose, onSaved }) {
     e.preventDefault();
     setError("");
     if (!form.name.trim()) { setError("Product name is required"); return; }
-    if (form.basePrice === "" || Number(form.basePrice) < 0) { setError("Valid price is required"); return; }
+    if (form.basePrice === "" || Number(form.basePrice) < 0) { setError("Valid selling price is required"); return; }
+    if (form.costPrice !== "" && Number(form.costPrice) > Number(form.basePrice)) {
+      setError("Cost price cannot be higher than selling price"); return;
+    }
     setLoading(true);
     try {
       const existingUrls = previewImages.filter(img => img.startsWith("http"));
       const payload = {
         ...form,
         basePrice: Number(form.basePrice),
+        costPrice: form.costPrice !== "" ? Number(form.costPrice) : null,
         minOrderQty: Number(form.minOrderQty) || 1,
         stock: form.trackStock && form.stock !== "" ? Number(form.stock) : null,
         images: [...existingUrls, ...newImages].slice(0, 3),
@@ -265,29 +271,20 @@ function ProductFormModal({ product, onClose, onSaved }) {
     }
   };
 
+  const margin = form.basePrice && form.costPrice
+    ? Math.round(((Number(form.basePrice) - Number(form.costPrice)) / Number(form.basePrice)) * 100)
+    : null;
+
   return (
     <div
       data-modal="true"
       onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 50,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "flex-end", justifyContent: "center",
-      }}
+      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
     >
       <div
         onClick={e => e.stopPropagation()}
         className="animate-in"
-        style={{
-          background: "var(--color-surface)",
-          borderRadius: "20px 20px 0 0",
-          width: "100%",
-          maxWidth: 480,
-          maxHeight: "calc(100dvh - 60px)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
+        style={{ background: "var(--color-surface)", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, maxHeight: "calc(100dvh - 60px)", display: "flex", flexDirection: "column", overflow: "hidden" }}
       >
         {/* Fixed header */}
         <div style={{ flexShrink: 0, borderBottom: "1px solid var(--color-border)" }}>
@@ -298,10 +295,7 @@ function ProductFormModal({ product, onClose, onSaved }) {
             <h2 style={{ fontWeight: 700, fontSize: "1rem", color: "var(--color-text-primary)" }}>
               {isEdit ? "Edit Product" : "Add Product"}
             </h2>
-            <button
-              onClick={onClose}
-              style={{ width: 30, height: 30, background: "var(--color-bg)", border: "none", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
+            <button onClick={onClose} style={{ width: 30, height: 30, background: "var(--color-bg)", border: "none", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <X size={16} color="var(--color-text-secondary)" />
             </button>
           </div>
@@ -319,15 +313,11 @@ function ProductFormModal({ product, onClose, onSaved }) {
 
             {/* Photos */}
             <div>
-              <p style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-tertiary)", marginBottom: 8 }}>
+              <p style={{ ...labelStyle, marginBottom: 8 }}>
                 Photos <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: "0.75rem" }}>(up to 3)</span>
               </p>
               {previewImages.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  style={{ width: "100%", height: 88, border: "1.5px dashed var(--color-border-strong)", borderRadius: "var(--radius-lg)", background: "var(--color-bg)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}
-                >
+                <button type="button" onClick={() => fileRef.current?.click()} style={{ width: "100%", height: 88, border: "1.5px dashed var(--color-border-strong)", borderRadius: "var(--radius-lg)", background: "var(--color-bg)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
                   <Camera size={20} color="var(--color-text-tertiary)" />
                   <span style={{ fontSize: "0.875rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>Add product photos</span>
                 </button>
@@ -358,10 +348,10 @@ function ProductFormModal({ product, onClose, onSaved }) {
               <input className="input" placeholder="e.g. Rose Plant, Cotton T-shirt" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
             </div>
 
-            {/* Price + Unit */}
+            {/* Selling Price + Unit */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
-                <label style={labelStyle}>Price (₹) *</label>
+                <label style={labelStyle}>Selling Price (₹) *</label>
                 <input className="input" type="number" placeholder="0" min="0" step="0.01" value={form.basePrice} onChange={e => setForm({ ...form, basePrice: e.target.value })} required />
               </div>
               <div>
@@ -370,6 +360,28 @@ function ProductFormModal({ product, onClose, onSaved }) {
                   {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
+            </div>
+
+            {/* Cost Price */}
+            <div>
+              <label style={labelStyle}>
+                Cost Price (₹) <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>optional — for profit tracking</span>
+              </label>
+              <input
+                className="input"
+                type="number"
+                placeholder="Your purchase cost per unit"
+                min="0"
+                step="0.01"
+                value={form.costPrice}
+                onChange={e => setForm({ ...form, costPrice: e.target.value })}
+              />
+              {/* Live margin preview */}
+              {margin !== null && (
+                <p style={{ fontSize: "0.75rem", marginTop: 5, color: margin >= 20 ? "var(--color-success)" : margin >= 0 ? "var(--color-warning)" : "var(--color-danger)", fontWeight: 500 }}>
+                  {margin >= 0 ? `${margin}% margin · profit ${formatCurrency(Number(form.basePrice) - Number(form.costPrice))} per ${form.unit}` : "Cost exceeds selling price"}
+                </p>
+              )}
             </div>
 
             {/* Category */}
