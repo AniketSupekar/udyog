@@ -138,7 +138,7 @@ export const placeStorefrontOrder = asyncHandler(async (req, res) => {
       address: address?.trim() || "",
     },
     orderDate: new Date(),
-    deliveryDate: null, // admin will set this manually
+    deliveryDate: null,
     items: lineItems,
     financial: {
       subtotal,
@@ -162,13 +162,15 @@ export const placeStorefrontOrder = asyncHandler(async (req, res) => {
     orderId: order._id,
     orderRef: order._id.toString().slice(-8).toUpperCase(),
     total,
+    items: lineItems,
+    customerName: name.trim(),
     businessName: business.name,
     whatsappNumber: business.store.whatsappNumber || business.phone,
   }, "Order placed successfully!", 201);
 });
 
 /* ─── GET /api/store/:slug/order/:orderId ──────────────────────────────────────
-   Public — customer checks order status
+   Public — customer checks single order status
 ─────────────────────────────────────────────────────────────────────────────── */
 export const getOrderStatus = asyncHandler(async (req, res) => {
   const { slug, orderId } = req.params;
@@ -196,6 +198,52 @@ export const getOrderStatus = asyncHandler(async (req, res) => {
     items: order.items,
     orderDate: order.orderDate,
     deliveryDate: order.deliveryDate,
+  });
+});
+
+/* ─── GET /api/store/:slug/orders?phone=XXXXXXXXXX ─────────────────────────────
+   Public — customer looks up all their orders by phone number
+─────────────────────────────────────────────────────────────────────────────── */
+export const getOrdersByPhone = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  const { phone } = req.query;
+
+  if (!phone?.trim()) throw ApiError.badRequest("Phone number is required");
+
+  const digits = phone.replace(/\D/g, "").slice(-10);
+  if (digits.length < 10) throw ApiError.badRequest("Enter a valid 10-digit phone number");
+
+  const business = await Business.findOne({
+    "store.slug": slug,
+    "store.isActive": true,
+    isActive: true,
+  }).lean();
+
+  if (!business) throw ApiError.notFound("Store not found");
+
+  const orders = await Order.find({
+    businessId: business._id,
+    source: "STOREFRONT",
+    "clientSnapshot.phone": { $regex: digits },
+    isDeleted: false,
+  })
+    .select("status payment.status payment.remainingAmount financial.total items orderDate deliveryDate createdAt")
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
+
+  sendSuccess(res, {
+    orders: orders.map(o => ({
+      orderId: o._id,
+      orderRef: o._id.toString().slice(-8).toUpperCase(),
+      status: o.status,
+      paymentStatus: o.payment.status,
+      total: o.financial.total,
+      remaining: o.payment.remainingAmount,
+      items: o.items,
+      orderDate: o.orderDate,
+      deliveryDate: o.deliveryDate,
+    })),
   });
 });
 
@@ -234,7 +282,5 @@ export const updateStoreSettings = asyncHandler(async (req, res) => {
 
   await business.save();
 
-  sendSuccess(res, {
-    store: business.store,
-  }, "Store settings updated");
+  sendSuccess(res, { store: business.store }, "Store settings updated");
 });

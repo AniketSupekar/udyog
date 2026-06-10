@@ -15,6 +15,9 @@ export const placeStorefrontOrder = (slug, data) =>
 export const getStorefrontOrderStatus = (slug, orderId) =>
   axios.get(`${PUBLIC_BASE}/store/${slug}/order/${orderId}`);
 
+export const getOrdersByPhone = (slug, phone) =>
+  axios.get(`${PUBLIC_BASE}/store/${slug}/orders`, { params: { phone } });
+
 // ── Protected API — admin only ────────────────────────────────────────────
 
 export const updateStoreSettings = (data) =>

@@ -1,12 +1,28 @@
 // src/modules/products/product.controller.js
 import Product from "../../models/Product.js";
 import { getCache, setCache, delCache } from "../../config/redis.js";
+import { uploadImage, deleteImage } from "../../config/cloudinary.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendCreated } from "../../utils/ApiResponse.js";
 
 const CACHE_KEY = (businessId) => `products:${businessId}`;
 const CACHE_TTL = 300;
+
+/* ─── Helper: upload any base64 images, return final URL array ───────── */
+const resolveImages = async (images = []) => {
+  const resolved = await Promise.all(
+    images.map(async (img) => {
+      if (img.startsWith("data:")) {
+        // base64 — upload to Cloudinary and return URL
+        return await uploadImage(img);
+      }
+      // already a Cloudinary URL — keep as-is
+      return img;
+    })
+  );
+  return resolved.slice(0, 3);
+};
 
 /* ─── GET /api/products ──────────────────────────────────────────────── */
 export const getProducts = asyncHandler(async (req, res) => {
@@ -33,6 +49,8 @@ export const createProduct = asyncHandler(async (req, res) => {
   if (!name?.trim()) throw ApiError.badRequest("Product name is required");
   if (basePrice == null || basePrice < 0) throw ApiError.badRequest("Valid price is required");
 
+  const uploadedImages = await resolveImages(images || []);
+
   const product = await Product.create({
     businessId,
     name: name.trim(),
@@ -45,7 +63,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     trackStock: Boolean(trackStock),
     stock: trackStock && stock !== "" && stock != null ? Number(stock) : null,
     minOrderQty: Number(minOrderQty) || 1,
-    images: (images || []).slice(0, 3),
+    images: uploadedImages,
   });
 
   await delCache(CACHE_KEY(businessId));
@@ -77,9 +95,14 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (minOrderQty !== undefined) product.minOrderQty = Number(minOrderQty) || 1;
 
   if (images !== undefined) {
-    const existingUrls = (images || []).filter(img => img.startsWith("http"));
-    const newBase64 = (images || []).filter(img => img.startsWith("data:"));
-    product.images = [...existingUrls, ...newBase64].slice(0, 3);
+    // Delete removed Cloudinary images to avoid orphans
+    const removedUrls = product.images.filter(
+      (existing) => existing.startsWith("http") && !images.includes(existing)
+    );
+    await Promise.all(removedUrls.map(deleteImage));
+
+    // Upload any new base64 images, keep existing URLs
+    product.images = await resolveImages(images);
   }
 
   await product.save();

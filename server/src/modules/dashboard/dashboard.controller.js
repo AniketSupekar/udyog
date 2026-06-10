@@ -121,7 +121,6 @@ export const getDashboardSummaryForTenant = async (businessId) => {
       },
       { $group: { _id: null, total: { $sum: "$payment.remainingAmount" } } },
     ]),
-    // NEW — storefront orders that are still CREATED (not yet reviewed by admin)
     Order.countDocuments({
       businessId,
       source: "STOREFRONT",
@@ -136,7 +135,7 @@ export const getDashboardSummaryForTenant = async (businessId) => {
     upcoming,
     pending,
     totalOutstanding: totalOutstanding[0]?.total || 0,
-    storefrontNew, // NEW
+    storefrontNew,
   };
 
   await setCache(cacheKey, data, 30);
@@ -176,8 +175,18 @@ const computeSnapshot = async (businessId, startDate, endDate, month) => {
       $match: {
         businessId: new mongoose.Types.ObjectId(businessId),
         status: "DELIVERED",
-        deliveryDate: { $gte: start, $lte: end },
         isDeleted: false,
+      },
+    },
+    // Use deliveryDate if set, otherwise fall back to createdAt
+    {
+      $addFields: {
+        effectiveDate: { $ifNull: ["$deliveryDate", "$createdAt"] },
+      },
+    },
+    {
+      $match: {
+        effectiveDate: { $gte: start, $lte: end },
       },
     },
     {

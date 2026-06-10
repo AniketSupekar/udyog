@@ -1,13 +1,13 @@
 // src/components/BottomNav.jsx
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ClipboardList, BarChart3, Settings, IndianRupee } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Package, BarChart3, Settings } from "lucide-react";
 
 const navItems = [
-  { label: "Dashboard", path: "/dashboard",   icon: LayoutDashboard },
-  { label: "Orders",    path: "/orders",       icon: ClipboardList },
-  { label: "Dues",      path: "/outstanding",  icon: IndianRupee },
-  { label: "Analytics", path: "/analytics",    icon: BarChart3 },
-  { label: "Settings",  path: "/settings",     icon: Settings },
+  { label: "Dashboard", path: "/dashboard",  icon: LayoutDashboard },
+  { label: "Orders",    path: "/orders",      icon: ClipboardList },
+  { label: "Products",  path: "/products",    icon: Package },
+  { label: "Analytics", path: "/analytics",   icon: BarChart3 },
+  { label: "Settings",  path: "/settings",    icon: Settings },
 ];
 
 export default function BottomNav() {
@@ -22,11 +22,7 @@ export default function BottomNav() {
     }}>
       <div style={{ maxWidth: 768, margin: "0 auto", display: "flex", height: 64 }}>
         {navItems.map(({ path, label, icon: Icon }) => (
-          <NavLink
-            key={path}
-            to={path}
-            style={{ flex: 1, textDecoration: "none" }}
-          >
+          <NavLink key={path} to={path} style={{ flex: 1, textDecoration: "none" }}>
             {({ isActive }) => (
               <div style={{
                 display: "flex", flexDirection: "column", alignItems: "center",

@@ -19,6 +19,13 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
+  // Shared $addFields stage — resolves effective date for all aggregations
+  const addEffectiveDate = {
+    $addFields: {
+      effectiveDate: { $ifNull: ["$deliveryDate", "$createdAt"] },
+    },
+  };
+
   const [revenueTrend, topClients, paymentBreakdown, collectionSummary, products] =
     await Promise.all([
       // Monthly revenue trend — delivered orders
@@ -27,13 +34,18 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
           $match: {
             businessId: new mongoose.Types.ObjectId(businessId),
             status: "DELIVERED",
-            deliveryDate: { $gte: sixMonthsAgo },
             isDeleted: false,
+          },
+        },
+        addEffectiveDate,
+        {
+          $match: {
+            effectiveDate: { $gte: sixMonthsAgo },
           },
         },
         {
           $group: {
-            _id: { year: { $year: "$deliveryDate" }, month: { $month: "$deliveryDate" } },
+            _id: { year: { $year: "$effectiveDate" }, month: { $month: "$effectiveDate" } },
             revenue: { $sum: "$financial.total" },
             collected: { $sum: "$payment.totalPaid" },
             orders: { $sum: 1 },
@@ -88,8 +100,13 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
           $match: {
             businessId: new mongoose.Types.ObjectId(businessId),
             status: "DELIVERED",
-            deliveryDate: { $gte: monthStart, $lte: monthEnd },
             isDeleted: false,
+          },
+        },
+        addEffectiveDate,
+        {
+          $match: {
+            effectiveDate: { $gte: monthStart, $lte: monthEnd },
           },
         },
         {
@@ -98,8 +115,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
             totalRevenue: { $sum: "$financial.total" },
             totalCollected: { $sum: "$payment.totalPaid" },
             totalOrders: { $sum: 1 },
-            // unwind items to calculate cost
-            items: { $push: "$items" },
           },
         },
       ]),
@@ -112,8 +127,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       }).select("name basePrice costPrice").lean(),
     ]);
 
-  // Build product cost map: productName -> costPrice/basePrice ratio
-  // We'll use this to estimate cost from order line items
+  // Build product cost map
   const productCostMap = {};
   products.forEach(p => {
     productCostMap[p.name.toLowerCase()] = {
@@ -122,14 +136,23 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
     };
   });
 
-  // Calculate profit for this month's delivered orders
-  // by looking up cost price for each line item
-  const thisMonthOrders = await Order.find({
-    businessId,
-    status: "DELIVERED",
-    deliveryDate: { $gte: monthStart, $lte: monthEnd },
-    isDeleted: false,
-  }).select("items financial").lean();
+  // Calculate cost for this month's delivered orders
+  const thisMonthOrders = await Order.aggregate([
+    {
+      $match: {
+        businessId: new mongoose.Types.ObjectId(businessId),
+        status: "DELIVERED",
+        isDeleted: false,
+      },
+    },
+    addEffectiveDate,
+    {
+      $match: {
+        effectiveDate: { $gte: monthStart, $lte: monthEnd },
+      },
+    },
+    { $project: { items: 1 } },
+  ]);
 
   let totalCost = 0;
   let itemsWithCost = 0;

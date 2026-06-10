@@ -1,10 +1,10 @@
 // src/pages/StoreOrderConfirm.jsx
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { getStorefrontOrderStatus } from "../services/store.api";
 import { formatCurrency } from "../utils/currency.util";
 import { formatDate } from "../utils/date.util";
-import { CheckCircle, Clock, Package, Truck, XCircle, MessageCircle, Copy, Check } from "lucide-react";
+import { CheckCircle, Clock, Package, Truck, XCircle, MessageCircle, Copy, Check, Search } from "lucide-react";
 
 const F = { sans: "Inter, sans-serif" };
 
@@ -17,6 +17,7 @@ const STATUS_CONFIG = {
 
 export default function StoreOrderConfirm() {
   const { slug, orderId } = useParams();
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -56,6 +57,14 @@ export default function StoreOrderConfirm() {
 
   const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.CREATED;
   const Icon = cfg.icon;
+
+  const openWhatsApp = () => {
+    if (!order.whatsappNumber) return;
+    const digits = order.whatsappNumber.replace(/\D/g, "");
+    const normalized = digits.startsWith("91") ? digits : `91${digits}`;
+    const text = encodeURIComponent(`Hi, I have a query about my order #${order.orderRef}`);
+    window.open(`https://wa.me/${normalized}?text=${text}`, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div style={{ minHeight: "100dvh", background: "#F7F7F8", fontFamily: F.sans }}>
@@ -125,25 +134,40 @@ export default function StoreOrderConfirm() {
           )}
         </div>
 
-        {/* Save ref tip */}
-        <div style={{ background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 12, padding: "12px 14px", marginBottom: 16, display: "flex", gap: 10 }}>
-          <span style={{ fontSize: "1rem", flexShrink: 0 }}>💡</span>
-          <p style={{ fontSize: "0.8125rem", color: "#92400E", lineHeight: 1.5 }}>
-            Save your order reference <strong>#{order.orderRef}</strong> to track this order later.
-          </p>
-        </div>
-
         {/* Actions */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+
+          {/* WhatsApp contact — shown only if store has WA number */}
+          {order.whatsappNumber && (
+            <button
+              onClick={openWhatsApp}
+              style={{ width: "100%", height: 50, background: "#16A34A", color: "white", border: "none", borderRadius: 14, fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", fontFamily: F.sans, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              <MessageCircle size={18} />
+              Contact on WhatsApp
+            </button>
+          )}
+
+          {/* Track more orders */}
+          <button
+            onClick={() => {
+              navigate(`/store/${slug}`, { state: { openTrack: true } });
+            }}
+            style={{ width: "100%", height: 46, background: "white", color: "#0F1117", border: "1px solid #E4E4E7", borderRadius: 14, fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", fontFamily: F.sans, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+          >
+            <Search size={16} />
+            Track Another Order
+          </button>
+
           <Link
             to={`/store/${slug}`}
-            style={{ display: "block", textAlign: "center", background: "#0F1117", color: "white", padding: "15px", borderRadius: 14, fontSize: "0.9375rem", fontWeight: 600, textDecoration: "none" }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 46, background: "#0F1117", color: "white", borderRadius: 14, fontSize: "0.9375rem", fontWeight: 600, textDecoration: "none" }}
           >
             Continue Shopping
           </Link>
         </div>
 
-        <p style={{ textAlign: "center", fontSize: "0.75rem", color: "#B0B0B5", marginTop: 28 }}>
+        <p style={{ textAlign: "center", fontSize: "0.75rem", color: "#B0B0B5", marginTop: 8 }}>
           Powered by <strong style={{ color: "#6366F1" }}>Udyog</strong>
         </p>
       </div>
