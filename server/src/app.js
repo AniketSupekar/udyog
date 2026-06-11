@@ -1,26 +1,29 @@
-// src/app.js
 import "./config/env.js";
 import { env } from "./config/env.js";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import mongoSanitize from "express-mongo-sanitize";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
 
-import authRoutes        from "./modules/auth/auth.routes.js";
-import orderRoutes       from "./modules/orders/order.routes.js";
-import dashboardRoutes   from "./modules/dashboard/dashboard.routes.js";
-import notificationRoutes from "./modules/notifications/notification.routes.js";
-import businessRoutes    from "./modules/business/business.routes.js";
-import paymentRoutes     from "./modules/payments/payment.routes.js";
-import productRoutes     from "./modules/products/product.routes.js";
-import analyticsRoutes   from "./modules/analytics/analytics.routes.js";
-import clientRoutes      from "./modules/clients/client.routes.js";
-import payRoutes         from "./modules/pay/pay.routes.js";
-import storeRoutes       from "./modules/store/store.routes.js";
+import authRoutes          from "./modules/auth/auth.routes.js";
+import orderRoutes         from "./modules/orders/order.routes.js";
+import dashboardRoutes     from "./modules/dashboard/dashboard.routes.js";
+import notificationRoutes  from "./modules/notifications/notification.routes.js";
+import businessRoutes      from "./modules/business/business.routes.js";
+import paymentRoutes       from "./modules/payments/payment.routes.js";
+import productRoutes       from "./modules/products/product.routes.js";
+import analyticsRoutes     from "./modules/analytics/analytics.routes.js";
+import clientRoutes        from "./modules/clients/client.routes.js";
+import payRoutes           from "./modules/pay/pay.routes.js";
+import storeRoutes         from "./modules/store/store.routes.js";
 
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
-import { apiLimiter, authLimiter, cronLimiter } from "./middleware/rateLimiter.middleware.js";
+import { sanitizeInput } from "./middleware/sanitize.middleware.js";
+import {
+  apiLimiter, authLimiter, cronLimiter,
+} from "./middleware/rateLimiter.middleware.js";
 import { createTomorrowDeliveryNotifications } from "./modules/notifications/notification.service.js";
 import Business from "./models/Business.js";
 
@@ -29,8 +32,10 @@ connectDB();
 const app = express();
 app.set("trust proxy", 1);
 
+// Security headers
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
+// CORS
 const allowedOrigins = [
   ...(process.env.CLIENT_ORIGIN?.split(",") || []),
   ...(env.isDev ? ["http://localhost:5173", "http://localhost:5174"] : []),
@@ -38,40 +43,51 @@ const allowedOrigins = [
 
 app.use(cors({
   origin(origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, storefront)
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     console.warn("Blocked CORS from:", origin);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
 }));
-
 app.options("*", cors());
 
-app.use(express.json({ limit: "10mb" })); // increased for base64 image uploads
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// Body parsing
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
+
+// Input sanitization pipeline
+app.use(mongoSanitize({
+  replaceWith: "_",
+  onSanitize: ({ req, key }) => {
+    console.warn(`Sanitized key "${key}" from ${req.method} ${req.path}`);
+  },
+}));
+app.use(sanitizeInput);
+
+// Global rate limit
 app.use("/api", apiLimiter);
 
+// Health
 app.get("/health", (req, res) =>
   res.json({ success: true, status: "ok", timestamp: new Date().toISOString() })
 );
 
-// ─── Routes ───────────────────────────────────────────────────────────────
-app.use("/api/auth",          authLimiter, authRoutes);
-app.use("/api/orders",        orderRoutes);
-app.use("/api/dashboard",     dashboardRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/business",      businessRoutes);
-app.use("/api/payments",      paymentRoutes);
-app.use("/api/products",      productRoutes);
-app.use("/api/analytics",     analyticsRoutes);
-app.use("/api/clients",       clientRoutes);
-app.use("/api/pay",           payRoutes);
-app.use("/api/store",         storeRoutes); // public storefront + admin store settings
+// Routes — all versioned under /api/v1
+app.use("/api/v1/auth",          authLimiter, authRoutes);
+app.use("/api/v1/orders",        orderRoutes);
+app.use("/api/v1/dashboard",     dashboardRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/business",      businessRoutes);
+app.use("/api/v1/payments",      paymentRoutes);
+app.use("/api/v1/products",      productRoutes);
+app.use("/api/v1/analytics",     analyticsRoutes);
+app.use("/api/v1/clients",       clientRoutes);
+app.use("/api/v1/pay",           payRoutes);
+app.use("/api/v1/store",         storeRoutes);
 
-// ─── Cron ─────────────────────────────────────────────────────────────────
-app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
+// Cron
+app.post("/api/v1/cron/notifications", cronLimiter, async (req, res, next) => {
   try {
     const businesses = await Business.find({ isActive: true }, "_id");
     let totalCreated = 0;
@@ -83,6 +99,7 @@ app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Error handling
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 

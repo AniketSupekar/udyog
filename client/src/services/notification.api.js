@@ -1,9 +1,8 @@
-// src/services/notification.api.js
 import api from "./api";
 
 export const getNotifications = async () => {
   const { data } = await api.get("/notifications");
-  return data.data; // unwrap — returns array
+  return data.data;
 };
 
 export const markNotificationRead = async (id) => {

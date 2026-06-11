@@ -1,4 +1,3 @@
-// src/services/business.api.js
 import api from "./api";
 
 export const getBusinessProfile = async () => {

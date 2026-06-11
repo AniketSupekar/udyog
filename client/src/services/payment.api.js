@@ -1,4 +1,3 @@
-// src/services/payment.api.js
 import api from "./api";
 
 export const getOutstanding = async (params = {}) => {

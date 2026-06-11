@@ -1,18 +1,11 @@
 // src/modules/orders/order.controller.js
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
-import { delCache } from "../../config/redis.js";
+import { invalidateOrderCache } from "../../utils/cacheManager.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendCreated, sendPaginated } from "../../utils/ApiResponse.js";
 import { calculateOrderTotals, getPaymentStatus } from "../../utils/calculations.js";
-
-const invalidateOrderCache = async (businessId) => {
-  await Promise.all([
-    delCache(`dashboard:*:${businessId}`),
-    delCache(`orders:*:${businessId}*`),
-  ]);
-};
 
 const STATUS_TRANSITIONS = {
   CREATED: ["PENDING", "CANCELLED"],
@@ -21,7 +14,7 @@ const STATUS_TRANSITIONS = {
   CANCELLED: [],
 };
 
-/* ─── POST /api/orders ─────────────────────────────────────────────────────── */
+/* ─── POST /api/v1/orders ─────────────────────────────────────────────── */
 export const createOrder = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const {
@@ -109,7 +102,7 @@ export const createOrder = asyncHandler(async (req, res) => {
   sendCreated(res, order, "Order created successfully");
 });
 
-/* ─── GET /api/orders ──────────────────────────────────────────────────────── */
+/* ─── GET /api/v1/orders ──────────────────────────────────────────────── */
 export const getAllOrders = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const {
@@ -119,7 +112,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
     status,
     paymentStatus,
     filter,
-    source,           // NEW — "STOREFRONT" | "ADMIN"
+    source,
     showDeleted = "false",
   } = req.query;
 
@@ -127,7 +120,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
   if (showDeleted !== "true") query.isDeleted = false;
   if (status) query.status = status;
   if (paymentStatus) query["payment.status"] = paymentStatus;
-  if (source) query.source = source;  // NEW — filter by source
+  if (source) query.source = source;
 
   if (search.trim()) {
     query["clientSnapshot.name"] = { $regex: search.trim(), $options: "i" };
@@ -168,7 +161,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
   });
 });
 
-/* ─── GET /api/orders/:id ──────────────────────────────────────────────────── */
+/* ─── GET /api/v1/orders/:id ──────────────────────────────────────────── */
 export const getOrderById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw ApiError.badRequest("Invalid order ID", "INVALID_ID");
@@ -185,7 +178,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
   sendSuccess(res, order);
 });
 
-/* ─── PATCH /api/orders/:id/status ────────────────────────────────────────── */
+/* ─── PATCH /api/v1/orders/:id/status ────────────────────────────────── */
 export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!status) throw ApiError.badRequest("Status is required", "MISSING_STATUS");
@@ -200,7 +193,10 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
   const allowed = STATUS_TRANSITIONS[order.status];
   if (!allowed?.includes(status)) {
-    throw ApiError.badRequest(`Cannot transition from ${order.status} to ${status}`, "INVALID_STATUS_TRANSITION");
+    throw ApiError.badRequest(
+      `Cannot transition from ${order.status} to ${status}`,
+      "INVALID_STATUS_TRANSITION"
+    );
   }
 
   order.status = status;
@@ -210,7 +206,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   sendSuccess(res, order, `Order marked as ${status}`);
 });
 
-/* ─── PATCH /api/orders/:id ────────────────────────────────────────────────── */
+/* ─── PATCH /api/v1/orders/:id ───────────────────────────────────────── */
 export const updateOrderDetails = asyncHandler(async (req, res) => {
   const order = await Order.findOne({
     _id: req.params.id,
@@ -236,8 +232,14 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
 
     const { subtotal, discountAmount, taxAmount, total } = calculateOrderTotals(
       computedItems,
-      { type: financial?.discountType || order.financial.discountType, value: financial?.discountValue ?? order.financial.discountValue },
-      { type: financial?.taxType || order.financial.taxType, rate: financial?.taxRate ?? order.financial.taxRate }
+      {
+        type: financial?.discountType || order.financial.discountType,
+        value: financial?.discountValue ?? order.financial.discountValue,
+      },
+      {
+        type: financial?.taxType || order.financial.taxType,
+        rate: financial?.taxRate ?? order.financial.taxRate,
+      }
     );
 
     order.items = computedItems;
@@ -264,7 +266,7 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
   sendSuccess(res, order, "Order updated successfully");
 });
 
-/* ─── POST /api/orders/:id/payments ───────────────────────────────────────── */
+/* ─── POST /api/v1/orders/:id/payments ───────────────────────────────── */
 export const recordPayment = asyncHandler(async (req, res) => {
   const { amount, method = "CASH", reference, note } = req.body;
 
@@ -279,7 +281,9 @@ export const recordPayment = asyncHandler(async (req, res) => {
   });
 
   if (!order) throw ApiError.notFound("Order not found");
-  if (order.status === "CANCELLED") throw ApiError.badRequest("Cannot record payment for cancelled order", "ORDER_CANCELLED");
+  if (order.status === "CANCELLED") {
+    throw ApiError.badRequest("Cannot record payment for cancelled order", "ORDER_CANCELLED");
+  }
 
   const roundedAmount = Math.round(amount * 100) / 100;
 
@@ -304,11 +308,10 @@ export const recordPayment = asyncHandler(async (req, res) => {
 
   await order.save();
   await invalidateOrderCache(req.user.businessId);
-
   sendSuccess(res, order, "Payment recorded successfully");
 });
 
-/* ─── PATCH /api/orders/:id/delete ────────────────────────────────────────── */
+/* ─── PATCH /api/v1/orders/:id/delete ────────────────────────────────── */
 export const softDeleteOrder = asyncHandler(async (req, res) => {
   const order = await Order.findOneAndUpdate(
     { _id: req.params.id, businessId: req.user.businessId, isDeleted: false },

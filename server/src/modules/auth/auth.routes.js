@@ -10,23 +10,25 @@ import {
   forgotPassword,
   resetPassword,
   completeOnboarding,
+  deleteAccount,
 } from "./auth.controller.js";
 import { protect } from "../../middleware/auth.middleware.js";
-import { authLimiter } from "../../middleware/rateLimiter.middleware.js";
+import { authLimiter, resendOTPLimiter } from "../../middleware/rateLimiter.middleware.js";
 
 const router = express.Router();
 
 // Public routes
-router.post("/register", authLimiter, register);
-router.post("/verify-email", authLimiter, verifyEmail);
-router.post("/resend-otp", authLimiter, resendOTP);
-router.post("/login", authLimiter, login);
-router.post("/logout", logout);
-router.post("/forgot-password", authLimiter, forgotPassword);
-router.post("/reset-password", authLimiter, resetPassword);
+router.post("/register",        authLimiter,      register);
+router.post("/verify-email",    authLimiter,      verifyEmail);
+router.post("/resend-otp",      resendOTPLimiter, resendOTP);   // stricter dedicated limiter
+router.post("/login",           authLimiter,      login);
+router.post("/logout",          logout);
+router.post("/forgot-password", authLimiter,      forgotPassword);
+router.post("/reset-password",  authLimiter,      resetPassword);
 
 // Protected routes
-router.get("/me", protect, getMe);
-router.patch("/complete-onboarding", protect, completeOnboarding);
+router.get("/me",                    protect,               getMe);
+router.patch("/complete-onboarding", protect,               completeOnboarding);
+router.delete("/account",            protect, authLimiter,  deleteAccount);
 
 export default router;

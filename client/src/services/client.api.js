@@ -1,4 +1,3 @@
-// src/services/client.api.js
 import api from "./api";
 
 export const getClients = async (params = {}) => {

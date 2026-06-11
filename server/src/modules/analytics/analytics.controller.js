@@ -2,14 +2,17 @@
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
 import Product from "../../models/Product.js";
-import { getCache, setCache } from "../../config/redis.js";
+import {
+  getCache, setCache,
+  CACHE_KEYS, CACHE_TTL,
+} from "../../utils/cacheManager.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { sendSuccess } from "../../utils/ApiResponse.js";
 
-/* ─── GET /api/analytics/overview ───────────────────────────────────── */
+/* ─── GET /api/v1/analytics/overview ─────────────────────────────────── */
 export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const cacheKey = `analytics:overview:${businessId}`;
+  const cacheKey = CACHE_KEYS.analyticsOverview(businessId);
 
   const cached = await getCache(cacheKey);
   if (cached) return sendSuccess(res, cached);
@@ -19,7 +22,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  // Shared $addFields stage — resolves effective date for all aggregations
   const addEffectiveDate = {
     $addFields: {
       effectiveDate: { $ifNull: ["$deliveryDate", "$createdAt"] },
@@ -28,7 +30,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
 
   const [revenueTrend, topClients, paymentBreakdown, collectionSummary, products] =
     await Promise.all([
-      // Monthly revenue trend — delivered orders
       Order.aggregate([
         {
           $match: {
@@ -38,11 +39,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
           },
         },
         addEffectiveDate,
-        {
-          $match: {
-            effectiveDate: { $gte: sixMonthsAgo },
-          },
-        },
+        { $match: { effectiveDate: { $gte: sixMonthsAgo } } },
         {
           $group: {
             _id: { year: { $year: "$effectiveDate" }, month: { $month: "$effectiveDate" } },
@@ -54,7 +51,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
-      // Top 5 clients by revenue
       Order.aggregate([
         {
           $match: {
@@ -75,7 +71,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         { $limit: 5 },
       ]),
 
-      // Payment method breakdown
       Order.aggregate([
         {
           $match: {
@@ -94,7 +89,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         { $sort: { total: -1 } },
       ]),
 
-      // This month delivered summary
       Order.aggregate([
         {
           $match: {
@@ -104,11 +98,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
           },
         },
         addEffectiveDate,
-        {
-          $match: {
-            effectiveDate: { $gte: monthStart, $lte: monthEnd },
-          },
-        },
+        { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
         {
           $group: {
             _id: null,
@@ -119,7 +109,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         },
       ]),
 
-      // All active products with costPrice set
       Product.find({
         businessId,
         isActive: true,
@@ -127,7 +116,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       }).select("name basePrice costPrice").lean(),
     ]);
 
-  // Build product cost map
   const productCostMap = {};
   products.forEach(p => {
     productCostMap[p.name.toLowerCase()] = {
@@ -136,7 +124,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
     };
   });
 
-  // Calculate cost for this month's delivered orders
   const thisMonthOrders = await Order.aggregate([
     {
       $match: {
@@ -146,11 +133,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       },
     },
     addEffectiveDate,
-    {
-      $match: {
-        effectiveDate: { $gte: monthStart, $lte: monthEnd },
-      },
-    },
+    { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
     { $project: { items: 1 } },
   ]);
 
@@ -217,6 +200,6 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
     },
   };
 
-  await setCache(cacheKey, data, 300);
+  await setCache(cacheKey, data, CACHE_TTL.analyticsOverview);
   sendSuccess(res, data);
 });

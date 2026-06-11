@@ -1,4 +1,3 @@
-// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
@@ -10,6 +9,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Storefront from "./pages/Storefront";
 import StoreOrderConfirm from "./pages/StoreOrderConfirm";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 // Protected pages
 import Dashboard from "./pages/Dashboard";
@@ -53,9 +54,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ── Public store routes — no auth needed ── */}
+        {/* ── Public store routes ── */}
         <Route path="/store/:slug" element={<Storefront />} />
         <Route path="/store/:slug/order/:orderId" element={<StoreOrderConfirm />} />
+
+        {/* ── Legal routes — always public ── */}
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
 
         {/* ── Auth routes ── */}
         <Route path="/login"           element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
@@ -67,16 +72,16 @@ function App() {
         <Route path="/onboarding" element={user ? <Onboarding /> : <Navigate to="/login" replace />} />
         <Route path="/" element={user ? <Layout /> : <Navigate to="/login" replace />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard"        element={<Dashboard />} />
-          <Route path="orders"           element={<OrdersList />} />
-          <Route path="orders/create"    element={<CreateOrder />} />
-          <Route path="orders/:id"       element={<OrderDetails />} />
-          <Route path="outstanding"      element={<Outstanding />} />
-          <Route path="clients"          element={<Clients />} />
-          <Route path="clients/:id"      element={<ClientDetails />} />
-          <Route path="analytics"        element={<Analytics />} />
-          <Route path="settings"         element={<Settings />} />
-          <Route path="products"         element={<Products />} />
+          <Route path="dashboard"     element={<Dashboard />} />
+          <Route path="orders"        element={<OrdersList />} />
+          <Route path="orders/create" element={<CreateOrder />} />
+          <Route path="orders/:id"    element={<OrderDetails />} />
+          <Route path="outstanding"   element={<Outstanding />} />
+          <Route path="clients"       element={<Clients />} />
+          <Route path="clients/:id"   element={<ClientDetails />} />
+          <Route path="analytics"     element={<Analytics />} />
+          <Route path="settings"      element={<Settings />} />
+          <Route path="products"      element={<Products />} />
         </Route>
 
         {/* ── Fallback ── */}

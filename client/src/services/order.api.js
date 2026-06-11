@@ -1,17 +1,13 @@
-// src/services/order.api.js
 import api from "./api";
-
-// ─── Orders ──────────────────────────────────────────────────────────────────
 
 export const fetchOrders = async (params = {}) => {
   const { data } = await api.get("/orders", { params });
-  // Returns { success, data: [], pagination: {} }
   return data;
 };
 
 export const fetchOrderById = async (id) => {
   const { data } = await api.get(`/orders/${id}`);
-  return data.data; // unwrap
+  return data.data;
 };
 
 export const createOrder = async (payload) => {

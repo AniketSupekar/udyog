@@ -1,44 +1,45 @@
 // src/modules/products/product.controller.js
 import Product from "../../models/Product.js";
-import { getCache, setCache, delCache } from "../../config/redis.js";
+import {
+  getCache, setCache,
+  CACHE_KEYS, CACHE_TTL,
+  invalidateProductCache,
+} from "../../utils/cacheManager.js";
 import { uploadImage, deleteImage } from "../../config/cloudinary.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendCreated } from "../../utils/ApiResponse.js";
-
-const CACHE_KEY = (businessId) => `products:${businessId}`;
-const CACHE_TTL = 300;
 
 /* ─── Helper: upload any base64 images, return final URL array ───────── */
 const resolveImages = async (images = []) => {
   const resolved = await Promise.all(
     images.map(async (img) => {
       if (img.startsWith("data:")) {
-        // base64 — upload to Cloudinary and return URL
         return await uploadImage(img);
       }
-      // already a Cloudinary URL — keep as-is
       return img;
     })
   );
   return resolved.slice(0, 3);
 };
 
-/* ─── GET /api/products ──────────────────────────────────────────────── */
+/* ─── GET /api/v1/products ───────────────────────────────────────────── */
 export const getProducts = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const cached = await getCache(CACHE_KEY(businessId));
+  const cacheKey = CACHE_KEYS.products(businessId);
+
+  const cached = await getCache(cacheKey);
   if (cached) return sendSuccess(res, cached);
 
   const products = await Product.find({ businessId, isActive: true })
     .sort({ name: 1 })
     .lean();
 
-  await setCache(CACHE_KEY(businessId), products, CACHE_TTL);
+  await setCache(cacheKey, products, CACHE_TTL.products);
   sendSuccess(res, products);
 });
 
-/* ─── POST /api/products ─────────────────────────────────────────────── */
+/* ─── POST /api/v1/products ──────────────────────────────────────────── */
 export const createProduct = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const {
@@ -66,11 +67,11 @@ export const createProduct = asyncHandler(async (req, res) => {
     images: uploadedImages,
   });
 
-  await delCache(CACHE_KEY(businessId));
+  await invalidateProductCache(businessId);
   sendCreated(res, product, "Product created");
 });
 
-/* ─── PATCH /api/products/:id ────────────────────────────────────────── */
+/* ─── PATCH /api/v1/products/:id ─────────────────────────────────────── */
 export const updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { businessId } = req.user;
@@ -95,22 +96,19 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (minOrderQty !== undefined) product.minOrderQty = Number(minOrderQty) || 1;
 
   if (images !== undefined) {
-    // Delete removed Cloudinary images to avoid orphans
     const removedUrls = product.images.filter(
       (existing) => existing.startsWith("http") && !images.includes(existing)
     );
     await Promise.all(removedUrls.map(deleteImage));
-
-    // Upload any new base64 images, keep existing URLs
     product.images = await resolveImages(images);
   }
 
   await product.save();
-  await delCache(CACHE_KEY(businessId));
+  await invalidateProductCache(businessId);
   sendSuccess(res, product, "Product updated");
 });
 
-/* ─── DELETE /api/products/:id (soft) ───────────────────────────────── */
+/* ─── DELETE /api/v1/products/:id (soft) ────────────────────────────── */
 export const deleteProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { businessId } = req.user;
@@ -122,6 +120,6 @@ export const deleteProduct = asyncHandler(async (req, res) => {
   );
   if (!product) throw ApiError.notFound("Product not found");
 
-  await delCache(CACHE_KEY(businessId));
+  await invalidateProductCache(businessId);
   sendSuccess(res, null, "Product deleted");
 });

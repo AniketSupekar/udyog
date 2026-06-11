@@ -1,4 +1,3 @@
-// src/models/User.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -25,7 +24,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: {
       type: String,
       required: true,
-      select: false, // Never returned in queries by default
+      select: false,
     },
     role: {
       type: String,
@@ -34,55 +33,27 @@ const userSchema = new mongoose.Schema(
     },
 
     // Email verification
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
-    emailOTP: {
-      type: String,
-      select: false,
-    },
-    emailOTPExpiry: {
-      type: Date,
-      select: false,
-    },
+    isEmailVerified: { type: Boolean, default: false },
+    emailOTP: { type: String, select: false },
+    emailOTPExpiry: { type: Date, select: false },
+
+    // OTP brute force protection — resets on each new OTP issued
+    otpFailedAttempts: { type: Number, default: 0, select: false },
+
+    // Resend cooldown — timestamp of last OTP send
+    resendOTPAt: { type: Date, default: null, select: false },
 
     // Password reset
-    passwordResetToken: {
-      type: String,
-      select: false,
-    },
-    passwordResetExpiry: {
-      type: Date,
-      select: false,
-    },
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpiry: { type: Date, select: false },
 
-    // Security: failed login attempts
-    failedLoginAttempts: {
-      type: Number,
-      default: 0,
-      select: false,
-    },
-    lockedUntil: {
-      type: Date,
-      default: null,
-      select: false,
-    },
+    // Login brute force protection
+    failedLoginAttempts: { type: Number, default: 0, select: false },
+    lockedUntil: { type: Date, default: null, select: false },
 
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    lastLoginAt: {
-      type: Date,
-      default: null,
-    },
-
-    // Onboarding state
-    onboardingCompleted: {
-      type: Boolean,
-      default: false,
-    },
+    isActive: { type: Boolean, default: true },
+    lastLoginAt: { type: Date, default: null },
+    onboardingCompleted: { type: Boolean, default: false },
   },
   {
     timestamps: true,

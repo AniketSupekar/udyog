@@ -8,16 +8,21 @@ import {
   updateStoreSettings,
 } from "./store.controller.js";
 import { protect } from "../../middleware/auth.middleware.js";
+import {
+  storefrontLimiter,
+  storeOrderLimiter,
+  storeTrackLimiter,
+} from "../../middleware/rateLimiter.middleware.js";
 
 const router = express.Router();
 
-// Public routes
-router.get("/:slug", getStorefront);
-router.post("/:slug/order", placeStorefrontOrder);
-router.get("/:slug/order/:orderId", getOrderStatus);
-router.get("/:slug/orders", getOrdersByPhone); // phone lookup
+// Public routes — each has its own appropriate rate limit
+router.get("/:slug",                storefrontLimiter,  getStorefront);
+router.post("/:slug/order",         storeOrderLimiter,  placeStorefrontOrder);
+router.get("/:slug/order/:orderId", storefrontLimiter,  getOrderStatus);
+router.get("/:slug/orders",         storeTrackLimiter,  getOrdersByPhone);
 
-// Protected routes
+// Protected — admin only
 router.patch("/settings", protect, updateStoreSettings);
 
 export default router;

@@ -1,7 +1,10 @@
 // src/modules/dashboard/dashboard.controller.js
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
-import { getCache, setCache } from "../../config/redis.js";
+import {
+  getCache, setCache,
+  CACHE_KEYS, CACHE_TTL,
+} from "../../utils/cacheManager.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { sendSuccess } from "../../utils/ApiResponse.js";
 
@@ -26,7 +29,7 @@ const findOrderList = (query) =>
     .select("clientSnapshot financial payment status deliveryDate orderDate createdAt notes source")
     .lean();
 
-/* ─── GET /api/dashboard/full ──────────────────────────────────────────────── */
+/* ─── GET /api/v1/dashboard/full ─────────────────────────────────────── */
 export const getFullDashboard = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { todayStart, todayEnd, upcomingEnd } = getDateRanges();
@@ -57,13 +60,13 @@ export const getFullDashboard = asyncHandler(async (req, res) => {
   sendSuccess(res, { summary, snapshot, overdue, dueToday, upcoming });
 });
 
-/* ─── GET /api/dashboard/summary ───────────────────────────────────────────── */
+/* ─── GET /api/v1/dashboard/summary ──────────────────────────────────── */
 export const getDashboardSummary = asyncHandler(async (req, res) => {
   const summary = await getDashboardSummaryForTenant(req.user.businessId);
   sendSuccess(res, summary);
 });
 
-/* ─── GET /api/dashboard/snapshot ──────────────────────────────────────────── */
+/* ─── GET /api/v1/dashboard/snapshot ─────────────────────────────────── */
 export const getBusinessSnapshot = asyncHandler(async (req, res) => {
   const { startDate, endDate, month } = req.query;
   const { businessId } = req.user;
@@ -77,10 +80,10 @@ export const getBusinessSnapshot = asyncHandler(async (req, res) => {
   sendSuccess(res, snapshot);
 });
 
-/* ─── TENANT-SCOPED HELPERS ────────────────────────────────────────────────── */
+/* ─── TENANT-SCOPED HELPERS ──────────────────────────────────────────── */
 
 export const getDashboardSummaryForTenant = async (businessId) => {
-  const cacheKey = `dashboard:summary:${businessId}`;
+  const cacheKey = CACHE_KEYS.dashboardSummary(businessId);
   const cached = await getCache(cacheKey);
   if (cached) return cached;
 
@@ -138,17 +141,17 @@ export const getDashboardSummaryForTenant = async (businessId) => {
     storefrontNew,
   };
 
-  await setCache(cacheKey, data, 30);
+  await setCache(cacheKey, data, CACHE_TTL.dashboardSummary);
   return data;
 };
 
 export const getBusinessSnapshotForTenant = async (businessId) => {
-  const cacheKey = `dashboard:snapshot:${businessId}`;
+  const cacheKey = CACHE_KEYS.dashboardSnapshot(businessId);
   const cached = await getCache(cacheKey);
   if (cached) return cached;
 
   const snapshot = await computeSnapshot(businessId);
-  await setCache(cacheKey, snapshot, 60);
+  await setCache(cacheKey, snapshot, CACHE_TTL.dashboardSnapshot);
   return snapshot;
 };
 
@@ -178,7 +181,6 @@ const computeSnapshot = async (businessId, startDate, endDate, month) => {
         isDeleted: false,
       },
     },
-    // Use deliveryDate if set, otherwise fall back to createdAt
     {
       $addFields: {
         effectiveDate: { $ifNull: ["$deliveryDate", "$createdAt"] },

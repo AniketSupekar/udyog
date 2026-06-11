@@ -1,8 +1,7 @@
-// src/services/store.api.js
 import api from "./api";
 import axios from "axios";
 
-const PUBLIC_BASE = import.meta.env.VITE_API_BASE_URL;
+const PUBLIC_BASE = `${import.meta.env.VITE_API_BASE_URL}/v1`;
 
 // ── Public API — no auth, uses plain axios ────────────────────────────────
 

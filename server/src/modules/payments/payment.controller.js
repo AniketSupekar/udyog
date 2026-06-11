@@ -1,14 +1,13 @@
 // src/modules/payments/payment.controller.js
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
+import { invalidateOrderCache } from "../../utils/cacheManager.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendPaginated } from "../../utils/ApiResponse.js";
-import { getCache, setCache, delCache } from "../../config/redis.js";
 import { daysOverdue } from "../../utils/calculations.js";
 
-/* ─── GET /api/payments/outstanding ──────────────────────────────────── */
-// All orders with unpaid/partial payment — sorted by urgency
+/* ─── GET /api/v1/payments/outstanding ───────────────────────────────── */
 export const getOutstanding = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { filter = "all", page = 1, limit = 20 } = req.query;
@@ -18,7 +17,6 @@ export const getOutstanding = asyncHandler(async (req, res) => {
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
-  // Base query — all unpaid orders
   const baseQuery = {
     businessId,
     "payment.status": { $in: ["UNPAID", "PARTIAL"] },
@@ -26,7 +24,6 @@ export const getOutstanding = asyncHandler(async (req, res) => {
     isDeleted: false,
   };
 
-  // Apply filter
   if (filter === "overdue") {
     baseQuery.deliveryDate = { $lt: today };
   } else if (filter === "due-today") {
@@ -47,7 +44,6 @@ export const getOutstanding = asyncHandler(async (req, res) => {
       .select("clientSnapshot financial payment status deliveryDate orderDate items createdAt")
       .lean(),
     Order.countDocuments(baseQuery),
-    // Summary: total outstanding amount across ALL unpaid (not just current page)
     Order.aggregate([
       {
         $match: {
@@ -62,9 +58,7 @@ export const getOutstanding = asyncHandler(async (req, res) => {
           _id: null,
           totalOutstanding: { $sum: "$payment.remainingAmount" },
           overdueCount: {
-            $sum: {
-              $cond: [{ $lt: ["$deliveryDate", today] }, 1, 0],
-            },
+            $sum: { $cond: [{ $lt: ["$deliveryDate", today] }, 1, 0] },
           },
           dueTodayCount: {
             $sum: {
@@ -85,14 +79,11 @@ export const getOutstanding = asyncHandler(async (req, res) => {
     ]),
   ]);
 
-  // Enrich orders with daysOverdue
   const enriched = orders.map((order) => ({
     ...order,
     daysOverdue: daysOverdue(order.deliveryDate),
     isOverdue: daysOverdue(order.deliveryDate) > 0,
   }));
-
-  const stats = summary[0] || { totalOutstanding: 0, overdueCount: 0, dueTodayCount: 0 };
 
   sendPaginated(
     res,
@@ -102,8 +93,7 @@ export const getOutstanding = asyncHandler(async (req, res) => {
   );
 });
 
-/* ─── POST /api/payments/outstanding — used by Dashboard summary ─────── */
-// Quick mark as paid (full remaining amount in one tap)
+/* ─── POST /api/v1/payments/:orderId/quick-pay ───────────────────────── */
 export const quickMarkPaid = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { businessId } = req.user;
@@ -133,8 +123,6 @@ export const quickMarkPaid = asyncHandler(async (req, res) => {
   order.payment.status = "PAID";
 
   await order.save();
-
-  await delCache(`dashboard:*:${businessId}`);
-
+  await invalidateOrderCache(businessId);
   sendSuccess(res, order, "Order marked as paid");
 });

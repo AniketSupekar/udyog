@@ -4,6 +4,10 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import User from "../../models/User.js";
 import Business from "../../models/Business.js";
+import Order from "../../models/Order.js";
+import Client from "../../models/Client.js";
+import Product from "../../models/Product.js";
+import Notification from "../../models/Notification.js";
 import { env } from "../../config/env.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
@@ -13,6 +17,8 @@ import { sendVerificationEmail, sendPasswordResetEmail } from "../../config/emai
 
 const MAX_FAILED_ATTEMPTS = 10;
 const LOCK_DURATION_MS = 30 * 60 * 1000;
+const MAX_OTP_ATTEMPTS = 5;
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
 
 const cookieOptions = {
   httpOnly: true,
@@ -60,6 +66,7 @@ export const register = asyncHandler(async (req, res) => {
         role: "ADMIN",
         emailOTP: otp,
         emailOTPExpiry: otpExpiry,
+        resendOTPAt: new Date(), // record initial send time
       }],
       { session }
     );
@@ -88,23 +95,54 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   if (!email || !otp) throw ApiError.badRequest("Email and OTP are required");
 
   const user = await User.findOne({ email: email.toLowerCase() })
-    .select("+emailOTP +emailOTPExpiry +passwordHash");
+    .select("+emailOTP +emailOTPExpiry +otpFailedAttempts +passwordHash");
 
   if (!user) throw ApiError.notFound("Account not found");
   if (user.isEmailVerified) throw ApiError.badRequest("Email is already verified");
-  if (!user.emailOTP || user.emailOTP !== otp) throw ApiError.badRequest("Invalid verification code");
-  if (new Date() > user.emailOTPExpiry) throw ApiError.badRequest("Code expired. Please request a new one.");
 
+  // OTP was invalidated due to too many failed attempts
+  if (!user.emailOTP) {
+    throw ApiError.badRequest("Verification code has been invalidated. Please request a new one.");
+  }
+
+  // Check expiry before checking correctness — don't leak attempt info on expired codes
+  if (new Date() > user.emailOTPExpiry) {
+    throw ApiError.badRequest("Code expired. Please request a new one.");
+  }
+
+  // Wrong OTP — increment failed attempts
+  if (user.emailOTP !== otp) {
+    user.otpFailedAttempts = (user.otpFailedAttempts || 0) + 1;
+
+    // After MAX_OTP_ATTEMPTS wrong attempts, kill the OTP and force resend
+    if (user.otpFailedAttempts >= MAX_OTP_ATTEMPTS) {
+      user.emailOTP = undefined;
+      user.emailOTPExpiry = undefined;
+      user.otpFailedAttempts = 0;
+      await user.save();
+      throw ApiError.badRequest("Too many incorrect attempts. Please request a new verification code.");
+    }
+
+    await user.save();
+    const attemptsLeft = MAX_OTP_ATTEMPTS - user.otpFailedAttempts;
+    throw ApiError.badRequest(
+      `Invalid verification code. ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} remaining.`
+    );
+  }
+
+  // Correct OTP — verify and clean up all OTP state
   user.isEmailVerified = true;
   user.emailOTP = undefined;
   user.emailOTPExpiry = undefined;
+  user.otpFailedAttempts = 0;
+  user.resendOTPAt = undefined;
   await user.save();
 
   const token = signToken(user);
   res.cookie("token", token, cookieOptions);
 
   sendSuccess(res, {
-    token, // returned in body for localStorage fallback
+    token,
     userId: user._id,
     businessId: user.businessId,
     name: user.name,
@@ -120,14 +158,27 @@ export const resendOTP = asyncHandler(async (req, res) => {
   if (!email) throw ApiError.badRequest("Email is required");
 
   const user = await User.findOne({ email: email.toLowerCase() })
-    .select("+emailOTP +emailOTPExpiry");
+    .select("+emailOTP +emailOTPExpiry +resendOTPAt +otpFailedAttempts");
 
   if (!user) throw ApiError.notFound("Account not found");
   if (user.isEmailVerified) throw ApiError.badRequest("Email already verified");
 
+  // 60s cooldown between resends
+  if (user.resendOTPAt) {
+    const secondsElapsed = (Date.now() - new Date(user.resendOTPAt).getTime()) / 1000;
+    if (secondsElapsed < OTP_RESEND_COOLDOWN_SECONDS) {
+      const wait = Math.ceil(OTP_RESEND_COOLDOWN_SECONDS - secondsElapsed);
+      throw ApiError.badRequest(
+        `Please wait ${wait} second${wait === 1 ? "" : "s"} before requesting a new code.`
+      );
+    }
+  }
+
   const otp = generateOTP();
   user.emailOTP = otp;
   user.emailOTPExpiry = new Date(Date.now() + 10 * 60 * 1000);
+  user.resendOTPAt = new Date();
+  user.otpFailedAttempts = 0; // Reset failed attempts on new OTP
   await user.save();
 
   sendVerificationEmail({ to: email, name: user.name, otp }).catch(console.error);
@@ -154,7 +205,6 @@ export const login = asyncHandler(async (req, res) => {
 
   if (!user.isActive) throw ApiError.forbidden("Account deactivated. Contact support.");
 
-  // Block login until email is verified
   if (!user.isEmailVerified) {
     throw ApiError.forbidden("Please verify your email before logging in. Check your inbox for the verification code.");
   }
@@ -180,7 +230,7 @@ export const login = asyncHandler(async (req, res) => {
   res.cookie("token", token, cookieOptions);
 
   sendSuccess(res, {
-    token, // returned in body for localStorage fallback
+    token,
     userId: user._id,
     businessId: user.businessId,
     name: user.name,
@@ -265,4 +315,49 @@ export const getMe = asyncHandler(async (req, res) => {
     .lean();
   if (!user) throw ApiError.unauthorized("User not found");
   sendSuccess(res, user);
+});
+
+/* ─── DELETE /api/auth/account ───────────────────────────────────────── */
+export const deleteAccount = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) throw ApiError.badRequest("Password is required to delete your account");
+
+  const user = await User.findById(req.user.userId).select("+passwordHash");
+  if (!user) throw ApiError.notFound("User not found");
+
+  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatch) throw ApiError.unauthorized("Incorrect password");
+
+  const businessId = req.user.businessId;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    await Promise.all([
+      Order.deleteMany({ businessId }, { session }),
+      Client.deleteMany({ businessId }, { session }),
+      Product.deleteMany({ businessId }, { session }),
+      Notification.deleteMany({ businessId }, { session }),
+    ]);
+
+    await Business.findByIdAndDelete(businessId, { session });
+    await User.findByIdAndDelete(req.user.userId, { session });
+
+    await session.commitTransaction();
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
+
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: env.isProd,
+    sameSite: env.isProd ? "none" : "lax",
+  });
+
+  sendSuccess(res, null, "Your account and all associated data have been permanently deleted.");
 });
