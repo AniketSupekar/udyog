@@ -5,7 +5,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor — attach token from localStorage if present
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -14,13 +13,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — handle 401 globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       const path = window.location.pathname;
-      const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
+      const publicPaths = [
+        "/login",
+        "/register",
+        "/forgot-password",
+        "/reset-password",
+        "/privacy-policy",
+        "/terms-of-service",
+      ];
       const isStorePath = path.startsWith("/store/");
 
       if (!publicPaths.includes(path) && !isStorePath) {
