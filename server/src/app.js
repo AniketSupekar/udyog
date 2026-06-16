@@ -18,12 +18,11 @@ import analyticsRoutes     from "./modules/analytics/analytics.routes.js";
 import clientRoutes        from "./modules/clients/client.routes.js";
 import payRoutes           from "./modules/pay/pay.routes.js";
 import storeRoutes         from "./modules/store/store.routes.js";
+import expenseRoutes       from "./modules/expenses/expense.routes.js";
 
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { sanitizeInput } from "./middleware/sanitize.middleware.js";
-import {
-  apiLimiter, authLimiter, cronLimiter,
-} from "./middleware/rateLimiter.middleware.js";
+import { apiLimiter, authLimiter, cronLimiter } from "./middleware/rateLimiter.middleware.js";
 import { createTomorrowDeliveryNotifications } from "./modules/notifications/notification.service.js";
 import Business from "./models/Business.js";
 
@@ -32,10 +31,8 @@ connectDB();
 const app = express();
 app.set("trust proxy", 1);
 
-// Security headers
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
-// CORS
 const allowedOrigins = [
   ...(process.env.CLIENT_ORIGIN?.split(",") || []),
   ...(env.isDev ? ["http://localhost:5173", "http://localhost:5174"] : []),
@@ -51,12 +48,10 @@ app.use(cors({
 }));
 app.options("*", cors());
 
-// Body parsing
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
 
-// Input sanitization pipeline
 app.use(mongoSanitize({
   replaceWith: "_",
   onSanitize: ({ req, key }) => {
@@ -65,15 +60,12 @@ app.use(mongoSanitize({
 }));
 app.use(sanitizeInput);
 
-// Global rate limit
 app.use("/api", apiLimiter);
 
-// Health
 app.get("/health", (req, res) =>
   res.json({ success: true, status: "ok", timestamp: new Date().toISOString() })
 );
 
-// Routes — all versioned under /api/v1
 app.use("/api/v1/auth",          authLimiter, authRoutes);
 app.use("/api/v1/orders",        orderRoutes);
 app.use("/api/v1/dashboard",     dashboardRoutes);
@@ -85,8 +77,8 @@ app.use("/api/v1/analytics",     analyticsRoutes);
 app.use("/api/v1/clients",       clientRoutes);
 app.use("/api/v1/pay",           payRoutes);
 app.use("/api/v1/store",         storeRoutes);
+app.use("/api/v1/expenses",      expenseRoutes);
 
-// Cron
 app.post("/api/v1/cron/notifications", cronLimiter, async (req, res, next) => {
   try {
     const businesses = await Business.find({ isActive: true }, "_id");
@@ -99,7 +91,6 @@ app.post("/api/v1/cron/notifications", cronLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Error handling
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 

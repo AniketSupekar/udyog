@@ -1,7 +1,7 @@
-// src/modules/analytics/analytics.controller.js
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
 import Product from "../../models/Product.js";
+import Expense from "../../models/Expense.js";
 import {
   getCache, setCache,
   CACHE_KEYS, CACHE_TTL,
@@ -9,7 +9,6 @@ import {
 import asyncHandler from "../../utils/asyncHandler.js";
 import { sendSuccess } from "../../utils/ApiResponse.js";
 
-/* ─── GET /api/v1/analytics/overview ─────────────────────────────────── */
 export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const cacheKey = CACHE_KEYS.analyticsOverview(businessId);
@@ -28,16 +27,10 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
     },
   };
 
-  const [revenueTrend, topClients, paymentBreakdown, collectionSummary, products] =
+  const [revenueTrend, topClients, paymentBreakdown, collectionSummary, products, expensesByCategory, totalExpenses] =
     await Promise.all([
       Order.aggregate([
-        {
-          $match: {
-            businessId: new mongoose.Types.ObjectId(businessId),
-            status: "DELIVERED",
-            isDeleted: false,
-          },
-        },
+        { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
         addEffectiveDate,
         { $match: { effectiveDate: { $gte: sixMonthsAgo } } },
         {
@@ -52,13 +45,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       ]),
 
       Order.aggregate([
-        {
-          $match: {
-            businessId: new mongoose.Types.ObjectId(businessId),
-            status: "DELIVERED",
-            isDeleted: false,
-          },
-        },
+        { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
         {
           $group: {
             _id: "$clientSnapshot.name",
@@ -72,12 +59,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       ]),
 
       Order.aggregate([
-        {
-          $match: {
-            businessId: new mongoose.Types.ObjectId(businessId),
-            isDeleted: false,
-          },
-        },
+        { $match: { businessId: new mongoose.Types.ObjectId(businessId), isDeleted: false } },
         { $unwind: "$payment.transactions" },
         {
           $group: {
@@ -90,13 +72,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       ]),
 
       Order.aggregate([
-        {
-          $match: {
-            businessId: new mongoose.Types.ObjectId(businessId),
-            status: "DELIVERED",
-            isDeleted: false,
-          },
-        },
+        { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
         addEffectiveDate,
         { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
         {
@@ -109,44 +85,51 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
         },
       ]),
 
-      Product.find({
-        businessId,
-        isActive: true,
-        costPrice: { $ne: null, $gt: 0 },
-      }).select("name basePrice costPrice").lean(),
+      Product.find({ businessId, isActive: true, costPrice: { $ne: null, $gt: 0 } })
+        .select("name basePrice costPrice").lean(),
+
+      // Expenses by category this month
+      Expense.aggregate([
+        { $match: { businessId: new mongoose.Types.ObjectId(businessId), date: { $gte: monthStart, $lte: monthEnd } } },
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { total: -1 } },
+      ]),
+
+      // Total expenses this month
+      Expense.aggregate([
+        { $match: { businessId: new mongoose.Types.ObjectId(businessId), date: { $gte: monthStart, $lte: monthEnd } } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
     ]);
 
+  // COGS calculation
   const productCostMap = {};
   products.forEach(p => {
-    productCostMap[p.name.toLowerCase()] = {
-      basePrice: p.basePrice,
-      costPrice: p.costPrice,
-    };
+    productCostMap[p.name.toLowerCase()] = { basePrice: p.basePrice, costPrice: p.costPrice };
   });
 
   const thisMonthOrders = await Order.aggregate([
-    {
-      $match: {
-        businessId: new mongoose.Types.ObjectId(businessId),
-        status: "DELIVERED",
-        isDeleted: false,
-      },
-    },
+    { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
     addEffectiveDate,
     { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
     { $project: { items: 1 } },
   ]);
 
-  let totalCost = 0;
+  let totalCOGS = 0;
   let itemsWithCost = 0;
   let itemsWithoutCost = 0;
 
   thisMonthOrders.forEach(order => {
     order.items.forEach(item => {
-      const key = item.productName?.toLowerCase();
-      const product = productCostMap[key];
-      if (product && product.costPrice) {
-        totalCost += product.costPrice * item.quantity;
+      const product = productCostMap[item.productName?.toLowerCase()];
+      if (product?.costPrice) {
+        totalCOGS += product.costPrice * item.quantity;
         itemsWithCost++;
       } else {
         itemsWithoutCost++;
@@ -165,12 +148,13 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
 
   const summary = collectionSummary[0] || { totalRevenue: 0, totalCollected: 0, totalOrders: 0 };
   const revenue = Math.round(summary.totalRevenue);
-  const cost = Math.round(totalCost);
-  const profit = revenue - cost;
+  const cogs = Math.round(totalCOGS);
+  const expenses = Math.round(totalExpenses[0]?.total || 0);
+
+  // Real profit = Revenue - COGS - Expenses
+  const profit = revenue - cogs - expenses;
   const profitMargin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
-  const collectionRate = revenue > 0
-    ? Math.round((summary.totalCollected / revenue) * 100)
-    : 0;
+  const collectionRate = revenue > 0 ? Math.round((summary.totalCollected / revenue) * 100) : 0;
   const hasCostData = products.length > 0;
 
   const data = {
@@ -192,12 +176,19 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       outstanding: Math.round(revenue - summary.totalCollected),
       orders: summary.totalOrders,
       collectionRate,
-      cost,
+      cogs,
+      expenses,
       profit,
       profitMargin,
       hasCostData,
+      hasExpenses: expenses > 0,
       partialCostData: itemsWithoutCost > 0 && itemsWithCost > 0,
     },
+    expensesByCategory: expensesByCategory.map(e => ({
+      category: e._id,
+      total: Math.round(e.total),
+      count: e.count,
+    })),
   };
 
   await setCache(cacheKey, data, CACHE_TTL.analyticsOverview);

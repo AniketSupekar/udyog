@@ -45,12 +45,11 @@ export default function Dashboard() {
         padding: "12px var(--page-padding)",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <div>
-          <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>{greeting()},</p>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
-            {user?.name?.split(" ")[0] || "Admin"} 👋
-          </h1>
-        </div>
+        <img
+          src="/logo.jpeg"
+          alt="Udyog"
+          style={{ height: 30, width: "auto", objectFit: "contain" }}
+        />
         <NotificationBell />
       </div>
 
@@ -239,9 +238,9 @@ function DashboardSkeleton() {
       <div style={{ height: 65, background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)" }} />
       <div className="page">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
-          {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 100, borderRadius: 16 }} />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="skeleton" style={{ height: 100, borderRadius: 16 }} />)}
         </div>
-        {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 72, borderRadius: 16, marginBottom: 10 }} />)}
+        {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 72, borderRadius: 16, marginBottom: 10 }} />)}
       </div>
     </>
   );

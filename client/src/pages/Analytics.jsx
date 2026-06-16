@@ -1,10 +1,9 @@
-// src/pages/Analytics.jsx
 import { useEffect, useState } from "react";
 import { getAnalyticsOverview } from "../services/analytics.api";
 import { getBusinessSnapshot } from "../services/dashboard.api";
 import { fetchOrders } from "../services/order.api";
 import { formatCurrency } from "../utils/currency.util";
-import { Users, CreditCard, BarChart2, Plus, TrendingUp } from "lucide-react";
+import { Users, CreditCard, BarChart2, Plus, TrendingUp, Receipt } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -12,6 +11,17 @@ const MONTH_OPTIONS = Array.from({ length: 12 }).map((_, i) => {
   const d = subMonths(new Date(), i);
   return { label: format(d, "MMMM yyyy"), value: format(d, "yyyy-MM") };
 });
+
+const CATEGORY_COLORS = {
+  RENT:      { color: "#7C3AED", bg: "#F5F3FF" },
+  SALARIES:  { color: "#1D4ED8", bg: "#EFF6FF" },
+  UTILITIES: { color: "#D97706", bg: "#FEF3C7" },
+  TRANSPORT: { color: "#0891B2", bg: "#ECFEFF" },
+  SUPPLIES:  { color: "#15803D", bg: "#F0FDF4" },
+  MARKETING: { color: "#DB2777", bg: "#FDF2F8" },
+  EQUIPMENT: { color: "#9F580A", bg: "#FFFBEB" },
+  OTHER:     { color: "#6B7280", bg: "#F9FAFB" },
+};
 
 export default function Analytics() {
   const navigate = useNavigate();
@@ -77,43 +87,64 @@ export default function Analytics() {
   }
 
   const t = overview?.thisMonth || {};
+  const expensesByCategory = overview?.expensesByCategory || [];
+  const totalExpenses = t.expenses || 0;
 
   return (
     <div className="page animate-in">
-      <div className="page-header">
-        <h1 className="page-title">Analytics</h1>
-        <p className="page-subtitle">Business performance overview</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+        <div className="page-header" style={{ margin: 0 }}>
+          <h1 className="page-title">Analytics</h1>
+          <p className="page-subtitle">Business performance overview</p>
+        </div>
+        <button
+          onClick={() => navigate("/expenses")}
+          className="btn btn-ghost btn-sm"
+          style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+        >
+          <Receipt size={15} /> Expenses
+        </button>
       </div>
 
       {/* ── THIS MONTH ── */}
       <p className="section-label">This Month</p>
 
-      {/* Revenue / Cost / Profit — the core three */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+      {/* Revenue / COGS / Expenses / Profit — four key numbers */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div className="card" style={{ padding: "14px 12px", textAlign: "center" }}>
           <p style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Revenue</p>
           <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: "#1D4ED8" }}>{formatCurrency(t.revenue || 0)}</p>
         </div>
         <div className="card" style={{ padding: "14px 12px", textAlign: "center" }}>
-          <p style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Cost</p>
+          <p style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>COGS</p>
           <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: "var(--color-danger)" }}>
-            {t.hasCostData ? formatCurrency(t.cost || 0) : "—"}
+            {t.hasCostData ? formatCurrency(t.cogs || 0) : "—"}
           </p>
         </div>
-        <div className="card" style={{ padding: "14px 12px", textAlign: "center", background: t.hasCostData && t.profit > 0 ? "var(--color-success-light)" : "var(--color-surface)", border: t.hasCostData && t.profit > 0 ? "1px solid #BBF7D0" : "1px solid var(--color-border)" }}>
+        <div className="card" style={{ padding: "14px 12px", textAlign: "center" }}>
+          <p style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Expenses</p>
+          <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: totalExpenses > 0 ? "var(--color-danger)" : "var(--color-text-tertiary)" }}>
+            {totalExpenses > 0 ? formatCurrency(totalExpenses) : "—"}
+          </p>
+        </div>
+        <div className="card" style={{
+          padding: "14px 12px", textAlign: "center",
+          background: (t.hasCostData || t.hasExpenses) && t.profit > 0 ? "var(--color-success-light)" : "var(--color-surface)",
+          border: (t.hasCostData || t.hasExpenses) && t.profit > 0 ? "1px solid #BBF7D0" : "1px solid var(--color-border)",
+        }}>
           <p style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Profit</p>
-          <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: t.hasCostData ? (t.profit >= 0 ? "var(--color-success)" : "var(--color-danger)") : "var(--color-text-tertiary)" }}>
-            {t.hasCostData ? formatCurrency(t.profit || 0) : "—"}
+          <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: (t.hasCostData || t.hasExpenses) ? (t.profit >= 0 ? "var(--color-success)" : "var(--color-danger)") : "var(--color-text-tertiary)" }}>
+            {(t.hasCostData || t.hasExpenses) ? formatCurrency(t.profit || 0) : "—"}
           </p>
         </div>
       </div>
 
-      {/* Profit margin + collection in one row */}
+      {/* Margin + Collection */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div className="card" style={{ padding: "14px 12px", textAlign: "center" }}>
           <p style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Margin</p>
-          <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: t.hasCostData ? (t.profitMargin >= 30 ? "var(--color-success)" : t.profitMargin >= 10 ? "var(--color-warning)" : "var(--color-danger)") : "var(--color-text-tertiary)" }}>
-            {t.hasCostData ? `${t.profitMargin}%` : "—"}
+          <p className="amount" style={{ fontSize: "1rem", fontWeight: 700, color: (t.hasCostData || t.hasExpenses) ? (t.profitMargin >= 30 ? "var(--color-success)" : t.profitMargin >= 10 ? "var(--color-warning)" : "var(--color-danger)") : "var(--color-text-tertiary)" }}>
+            {(t.hasCostData || t.hasExpenses) ? `${t.profitMargin}%` : "—"}
           </p>
         </div>
         <div className="card" style={{ padding: "14px 12px", textAlign: "center" }}>
@@ -122,12 +153,12 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* No cost data nudge */}
-      {!t.hasCostData && (
+      {/* Nudge if no cost or expense data */}
+      {!t.hasCostData && !t.hasExpenses && (
         <div style={{ background: "var(--color-warning-light)", border: "1px solid #FCD34D", borderRadius: "var(--radius-md)", padding: "10px 14px", marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start" }}>
           <TrendingUp size={15} color="var(--color-warning)" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{ fontSize: "0.8125rem", color: "var(--color-warning)" }}>
-            Add a <strong>cost price</strong> to your products to see profit and margin here.
+            Add <strong>cost prices</strong> to products and log <strong>expenses</strong> to see real profit here.
           </p>
         </div>
       )}
@@ -140,11 +171,56 @@ export default function Analytics() {
         </div>
       )}
 
-      {/* Orders this month */}
+      {/* Delivered orders */}
       <div className="card" style={{ padding: "14px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <p style={{ fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>Delivered Orders</p>
         <p className="amount" style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-text-primary)" }}>{t.orders || 0}</p>
       </div>
+
+      {/* EXPENSES BREAKDOWN */}
+      {expensesByCategory.length > 0 && (
+        <div className="card" style={{ padding: "16px", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Receipt size={15} color="var(--color-accent)" />
+              <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Expenses Breakdown</p>
+            </div>
+            <button
+              onClick={() => navigate("/expenses")}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.8125rem", color: "var(--color-accent)", fontWeight: 500 }}
+            >
+              View all
+            </button>
+          </div>
+          {expensesByCategory.map((e, i) => {
+            const cat = CATEGORY_COLORS[e.category] || CATEGORY_COLORS.OTHER;
+            const pct = totalExpenses > 0 ? Math.round((e.total / totalExpenses) * 100) : 0;
+            return (
+              <div key={i} style={{ marginBottom: i < expensesByCategory.length - 1 ? 14 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--color-text-primary)" }}>
+                      {e.category.charAt(0) + e.category.slice(1).toLowerCase()}
+                    </span>
+                  </div>
+                  <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span className="amount" style={{ fontSize: "0.875rem" }}>{formatCurrency(e.total)}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", minWidth: 32, textAlign: "right" }}>{pct}%</span>
+                  </span>
+                </div>
+                <div style={{ height: 6, background: "var(--color-bg)", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: cat.color, borderRadius: 99, transition: "width 0.4s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--color-border)", marginTop: 14, paddingTop: 12, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--color-text-primary)" }}>Total</span>
+            <span className="amount" style={{ fontWeight: 700, color: "var(--color-danger)" }}>{formatCurrency(totalExpenses)}</span>
+          </div>
+        </div>
+      )}
 
       {/* REVENUE TREND */}
       {overview?.revenueTrend?.length > 0 && (

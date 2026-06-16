@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
 
-// Public pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -12,7 +11,6 @@ import StoreOrderConfirm from "./pages/StoreOrderConfirm";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 
-// Protected pages
 import Dashboard from "./pages/Dashboard";
 import OrdersList from "./pages/OrdersList";
 import CreateOrder from "./pages/CreateOrder";
@@ -24,26 +22,16 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Products from "./pages/Products";
 import Onboarding from "./pages/Onboarding";
+import Expenses from "./pages/Expenses";
 
 function App() {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: "100dvh",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "var(--color-bg)",
-      }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg)" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{
-            width: 36, height: 36,
-            border: "3px solid var(--color-border)",
-            borderTopColor: "var(--color-accent)",
-            borderRadius: "50%",
-            animation: "spin 0.7s linear infinite",
-            margin: "0 auto 12px",
-          }} />
+          <div style={{ width: 36, height: 36, border: "3px solid var(--color-border)", borderTopColor: "var(--color-accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite", margin: "0 auto 12px" }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ fontSize: "0.875rem", color: "var(--color-text-tertiary)" }}>Loading…</p>
         </div>
@@ -54,21 +42,17 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ── Public store routes ── */}
         <Route path="/store/:slug" element={<Storefront />} />
         <Route path="/store/:slug/order/:orderId" element={<StoreOrderConfirm />} />
 
-        {/* ── Legal routes — always public ── */}
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
 
-        {/* ── Auth routes ── */}
         <Route path="/login"           element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/register"        element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
 
-        {/* ── Protected routes ── */}
         <Route path="/onboarding" element={user ? <Onboarding /> : <Navigate to="/login" replace />} />
         <Route path="/" element={user ? <Layout /> : <Navigate to="/login" replace />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
@@ -82,9 +66,9 @@ function App() {
           <Route path="analytics"     element={<Analytics />} />
           <Route path="settings"      element={<Settings />} />
           <Route path="products"      element={<Products />} />
+          <Route path="expenses"      element={<Expenses />} />
         </Route>
 
-        {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
       </Routes>
     </BrowserRouter>

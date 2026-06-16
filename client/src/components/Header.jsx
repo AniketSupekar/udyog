@@ -1,4 +1,3 @@
-// src/components/Header.jsx
 import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
@@ -32,14 +31,23 @@ export default function Header() {
       padding: "14px 0",
       marginBottom: 8,
     }}>
-      <div>
-        <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>
-          Order Management
-        </p>
-        <h1 style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>
-          Dashboard
-        </h1>
+      {/* Logo + title */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <img
+          src="/logo.png"
+          alt="Udyog"
+          style={{ width: 32, height: 32, objectFit: "contain" }}
+        />
+        <div>
+          <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontWeight: 500 }}>
+            Order Management
+          </p>
+          <h1 style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>
+            Dashboard
+          </h1>
+        </div>
       </div>
+
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <NotificationBell />
         {user && (
@@ -47,16 +55,12 @@ export default function Header() {
             <button
               onClick={() => setShowMenu(p => !p)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                height: 40,
-                padding: "0 12px",
+                display: "flex", alignItems: "center", gap: 8,
+                height: 40, padding: "0 12px",
                 background: "var(--color-surface)",
                 border: "1.5px solid var(--color-border)",
                 borderRadius: "var(--radius-full)",
-                cursor: "pointer",
-                transition: "all 0.15s",
+                cursor: "pointer", transition: "all 0.15s",
               }}
             >
               <div style={{
@@ -70,20 +74,16 @@ export default function Header() {
               </div>
               <ChevronDown size={14} color="var(--color-text-secondary)" style={{ transform: showMenu ? "rotate(180deg)" : "", transition: "transform 0.15s" }} />
             </button>
+
             {showMenu && (
-              <div
-                className="animate-in"
-                style={{
-                  position: "absolute", right: 0, top: "calc(100% + 6px)",
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-lg)",
-                  boxShadow: "var(--shadow-lg)",
-                  minWidth: 160,
-                  overflow: "hidden",
-                  zIndex: 100,
-                }}
-              >
+              <div className="animate-in" style={{
+                position: "absolute", right: 0, top: "calc(100% + 6px)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-lg)",
+                boxShadow: "var(--shadow-lg)",
+                minWidth: 160, overflow: "hidden", zIndex: 100,
+              }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)" }}>
                   <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{user.name}</p>
                   <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>{user.email}</p>
