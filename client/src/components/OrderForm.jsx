@@ -1,4 +1,3 @@
-// src/components/OrderForm.jsx
 import { useState, useEffect } from "react";
 import { createOrder } from "../services/order.api";
 import { getProducts } from "../services/product.api";
@@ -7,7 +6,7 @@ import { Plus, Trash2, Package, ChevronDown } from "lucide-react";
 import { formatCurrency } from "../utils/currency.util";
 
 const UNITS = ["piece","kg","gram","liter","ml","box","bundle","bag","set","unit"];
-const DEFAULT_ITEM = { productName: "", quantity: "", unitPrice: "", unit: "piece" };
+const DEFAULT_ITEM = { productName: "", quantity: "", unitPrice: "", costPrice: "", unit: "piece" };
 
 export default function OrderForm() {
   const navigate = useNavigate();
@@ -32,7 +31,14 @@ export default function OrderForm() {
       setItems(updated);
     } else {
       const emptyIdx = items.findIndex(i => !i.productName.trim());
-      const newItem = { productName: product.name, quantity: "1", unitPrice: String(product.basePrice), unit: product.unit };
+      const newItem = {
+        productName: product.name,
+        quantity: "1",
+        unitPrice: String(product.basePrice),
+        // Auto-fill cost price from catalog if available
+        costPrice: product.costPrice != null ? String(product.costPrice) : "",
+        unit: product.unit,
+      };
       if (emptyIdx >= 0) { const u = [...items]; u[emptyIdx] = newItem; setItems(u); }
       else setItems([...items, newItem]);
     }
@@ -61,7 +67,14 @@ export default function OrderForm() {
     try {
       await createOrder({
         clientSnapshot, orderDate, deliveryDate,
-        items: items.map(i => ({ productName: i.productName.trim(), quantity: parseFloat(i.quantity), unitPrice: parseFloat(i.unitPrice), unit: i.unit || "piece" })),
+        items: items.map(i => ({
+          productName: i.productName.trim(),
+          quantity: parseFloat(i.quantity),
+          unitPrice: parseFloat(i.unitPrice),
+          unit: i.unit || "piece",
+          // Only send costPrice if user actually entered something
+          costPrice: i.costPrice !== "" && i.costPrice != null ? parseFloat(i.costPrice) : null,
+        })),
         advancePaid: parseFloat(advancePaid) || 0,
         notes: notes.trim() || undefined,
       });
@@ -132,7 +145,14 @@ export default function OrderForm() {
                   style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderBottom: "1px solid var(--color-border)", background: "none", cursor: "pointer" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--color-surface)"}
                   onMouseLeave={e => e.currentTarget.style.background = "none"}>
-                  <span style={{ fontWeight: 500, fontSize: "0.9rem" }}>{p.name}</span>
+                  <div style={{ textAlign: "left" }}>
+                    <span style={{ fontWeight: 500, fontSize: "0.9rem", display: "block" }}>{p.name}</span>
+                    {p.costPrice && (
+                      <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>
+                        Cost: {formatCurrency(p.costPrice)}
+                      </span>
+                    )}
+                  </div>
                   <span className="amount" style={{ fontSize: "0.875rem", color: "var(--color-accent)" }}>{formatCurrency(p.basePrice)}/{p.unit}</span>
                 </button>
               ))}
@@ -148,12 +168,36 @@ export default function OrderForm() {
                   <select className="input" value={item.unit} onChange={e => updateItem(index, "unit", e.target.value)}>
                     {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                   </select>
-                  <input className="input" type="number" placeholder="₹ Price" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(index, "unitPrice", e.target.value)} required />
+                  <input className="input" type="number" placeholder="₹ Sell" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(index, "unitPrice", e.target.value)} required />
                 </div>
+
+                {/* Cost price — optional, for profit tracking */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    className="input"
+                    type="number"
+                    placeholder="₹ Cost (optional - for profit tracking)"
+                    min="0"
+                    step="0.01"
+                    value={item.costPrice}
+                    onChange={e => updateItem(index, "costPrice", e.target.value)}
+                    style={{ fontSize: "0.8125rem", background: "var(--color-surface)" }}
+                  />
+                </div>
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  {item.quantity && item.unitPrice
-                    ? <span className="amount" style={{ fontSize: "0.875rem", color: "var(--color-accent)", fontWeight: 600 }}>= {formatCurrency(parseFloat(item.quantity) * parseFloat(item.unitPrice))}</span>
-                    : <span />}
+                  {item.quantity && item.unitPrice ? (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span className="amount" style={{ fontSize: "0.875rem", color: "var(--color-accent)", fontWeight: 600 }}>
+                        = {formatCurrency(parseFloat(item.quantity) * parseFloat(item.unitPrice))}
+                      </span>
+                      {item.costPrice && item.quantity && (
+                        <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>
+                          Margin: {formatCurrency((parseFloat(item.unitPrice) - parseFloat(item.costPrice)) * parseFloat(item.quantity))}
+                        </span>
+                      )}
+                    </div>
+                  ) : <span />}
                   {items.length > 1 && (
                     <button type="button" onClick={() => setItems(items.filter((_, i) => i !== index))}
                       style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.8rem", color: "var(--color-danger)", background: "none", border: "none", cursor: "pointer" }}>

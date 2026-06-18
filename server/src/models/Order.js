@@ -1,4 +1,3 @@
-// src/models/Order.js
 import mongoose from "mongoose";
 
 const lineItemSchema = new mongoose.Schema(
@@ -7,6 +6,7 @@ const lineItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: [0.01, "Quantity must be greater than 0"] },
     unit: { type: String, trim: true, default: "piece" },
     unitPrice: { type: Number, required: true, min: [0, "Unit price cannot be negative"] },
+    costPrice: { type: Number, default: null, min: 0 }, // purchase cost for this specific order
     amount: { type: Number, required: true },
     notes: { type: String, trim: true, default: null },
   },
@@ -71,14 +71,11 @@ const orderSchema = new mongoose.Schema(
       enum: ["CREATED", "PENDING", "DELIVERED", "CANCELLED"],
       default: "CREATED",
     },
-
-    // ── Source — where did this order come from ────────────────────────
     source: {
       type: String,
       enum: ["ADMIN", "STOREFRONT"],
       default: "ADMIN",
     },
-
     notes: { type: String, trim: true, default: null },
     reminders: {
       deliveryReminderSent: { type: Boolean, default: false },
@@ -97,6 +94,6 @@ orderSchema.index({ businessId: 1, clientId: 1, createdAt: -1 });
 orderSchema.index({ businessId: 1, "clientSnapshot.name": 1 });
 orderSchema.index({ businessId: 1, deliveryDate: 1, "reminders.deliveryReminderSent": 1 });
 orderSchema.index({ businessId: 1, status: 1, deliveryDate: 1 });
-orderSchema.index({ businessId: 1, source: 1, createdAt: -1 }); // storefront orders query
+orderSchema.index({ businessId: 1, source: 1, createdAt: -1 });
 
 export default mongoose.model("Order", orderSchema);

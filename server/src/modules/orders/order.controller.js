@@ -1,4 +1,3 @@
-// src/modules/orders/order.controller.js
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
 import { invalidateOrderCache } from "../../utils/cacheManager.js";
@@ -17,26 +16,14 @@ const STATUS_TRANSITIONS = {
 /* ─── POST /api/v1/orders ─────────────────────────────────────────────── */
 export const createOrder = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const {
-    clientSnapshot,
-    clientId,
-    orderDate,
-    deliveryDate,
-    items,
-    financial,
-    advancePaid = 0,
-    notes,
-  } = req.body;
+  const { clientSnapshot, clientId, orderDate, deliveryDate, items, financial, advancePaid = 0, notes } = req.body;
 
-  if (!clientSnapshot?.name || !clientSnapshot?.phone) {
+  if (!clientSnapshot?.name || !clientSnapshot?.phone)
     throw ApiError.badRequest("Customer name and phone are required", "MISSING_CLIENT");
-  }
-  if (!orderDate || !deliveryDate) {
+  if (!orderDate || !deliveryDate)
     throw ApiError.badRequest("Order date and delivery date are required", "MISSING_DATES");
-  }
-  if (!items || !Array.isArray(items) || items.length === 0) {
+  if (!items || !Array.isArray(items) || items.length === 0)
     throw ApiError.badRequest("Order must have at least one item", "MISSING_ITEMS");
-  }
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -47,12 +34,15 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   const oDate = new Date(orderDate);
   const dDate = new Date(deliveryDate);
-  if (isNaN(oDate.getTime()) || isNaN(dDate.getTime())) {
+  if (isNaN(oDate.getTime()) || isNaN(dDate.getTime()))
     throw ApiError.badRequest("Invalid date format", "INVALID_DATE");
-  }
 
   const computedItems = items.map((item) => ({
-    ...item,
+    productName: item.productName.trim(),
+    quantity: item.quantity,
+    unit: item.unit || "piece",
+    unitPrice: item.unitPrice,
+    costPrice: item.costPrice != null && item.costPrice !== "" ? Number(item.costPrice) : null,
     amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
   }));
 
@@ -90,9 +80,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       totalPaid: advance,
       remainingAmount,
       status: getPaymentStatus(total, advance),
-      transactions: advance > 0
-        ? [{ amount: advance, method: "CASH", note: "Advance payment" }]
-        : [],
+      transactions: advance > 0 ? [{ amount: advance, method: "CASH", note: "Advance payment" }] : [],
     },
     notes: notes || null,
     status: "CREATED",
@@ -105,76 +93,41 @@ export const createOrder = asyncHandler(async (req, res) => {
 /* ─── GET /api/v1/orders ──────────────────────────────────────────────── */
 export const getAllOrders = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const {
-    page = 1,
-    limit = 10,
-    search = "",
-    status,
-    paymentStatus,
-    filter,
-    source,
-    showDeleted = "false",
-  } = req.query;
+  const { page = 1, limit = 10, search = "", status, paymentStatus, filter, source, showDeleted = "false" } = req.query;
 
   const query = { businessId };
   if (showDeleted !== "true") query.isDeleted = false;
   if (status) query.status = status;
   if (paymentStatus) query["payment.status"] = paymentStatus;
   if (source) query.source = source;
+  if (search.trim()) query["clientSnapshot.name"] = { $regex: search.trim(), $options: "i" };
 
-  if (search.trim()) {
-    query["clientSnapshot.name"] = { $regex: search.trim(), $options: "i" };
-  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-
-  if (filter === "due-today") {
-    query.deliveryDate = { $gte: today, $lte: endOfToday };
-  } else if (filter === "upcoming") {
-    query.deliveryDate = { $gt: endOfToday };
-  } else if (filter === "overdue") {
-    query.deliveryDate = { $lt: today };
-    query.status = { $nin: ["DELIVERED", "CANCELLED"] };
-  }
+  if (filter === "due-today") query.deliveryDate = { $gte: today, $lte: endOfToday };
+  else if (filter === "upcoming") query.deliveryDate = { $gt: endOfToday };
+  else if (filter === "overdue") { query.deliveryDate = { $lt: today }; query.status = { $nin: ["DELIVERED", "CANCELLED"] }; }
 
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
   const skip = (pageNum - 1) * limitNum;
 
   const [orders, total] = await Promise.all([
-    Order.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean(),
+    Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
     Order.countDocuments(query),
   ]);
 
-  sendPaginated(res, orders, {
-    page: pageNum,
-    limit: limitNum,
-    total,
-    totalPages: Math.ceil(total / limitNum),
-  });
+  sendPaginated(res, orders, { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) });
 });
 
 /* ─── GET /api/v1/orders/:id ──────────────────────────────────────────── */
 export const getOrderById = asyncHandler(async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.id)) {
+  if (!mongoose.isValidObjectId(req.params.id))
     throw ApiError.badRequest("Invalid order ID", "INVALID_ID");
-  }
 
-  const order = await Order.findOne({
-    _id: req.params.id,
-    businessId: req.user.businessId,
-    isDeleted: false,
-  }).lean();
-
+  const order = await Order.findOne({ _id: req.params.id, businessId: req.user.businessId, isDeleted: false }).lean();
   if (!order) throw ApiError.notFound("Order not found");
-
   sendSuccess(res, order);
 });
 
@@ -183,25 +136,15 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!status) throw ApiError.badRequest("Status is required", "MISSING_STATUS");
 
-  const order = await Order.findOne({
-    _id: req.params.id,
-    businessId: req.user.businessId,
-    isDeleted: false,
-  });
-
+  const order = await Order.findOne({ _id: req.params.id, businessId: req.user.businessId, isDeleted: false });
   if (!order) throw ApiError.notFound("Order not found");
 
   const allowed = STATUS_TRANSITIONS[order.status];
-  if (!allowed?.includes(status)) {
-    throw ApiError.badRequest(
-      `Cannot transition from ${order.status} to ${status}`,
-      "INVALID_STATUS_TRANSITION"
-    );
-  }
+  if (!allowed?.includes(status))
+    throw ApiError.badRequest(`Cannot transition from ${order.status} to ${status}`, "INVALID_STATUS_TRANSITION");
 
   order.status = status;
   await order.save();
-
   await invalidateOrderCache(req.user.businessId);
   sendSuccess(res, order, `Order marked as ${status}`);
 });
@@ -214,7 +157,6 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
     status: { $nin: ["DELIVERED", "CANCELLED"] },
     isDeleted: false,
   });
-
   if (!order) throw ApiError.notFound("Order not found or cannot be edited");
 
   const { clientSnapshot, orderDate, deliveryDate, items, financial, notes } = req.body;
@@ -226,20 +168,18 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
 
   if (items && Array.isArray(items) && items.length > 0) {
     const computedItems = items.map((item) => ({
-      ...item,
+      productName: item.productName.trim(),
+      quantity: item.quantity,
+      unit: item.unit || "piece",
+      unitPrice: item.unitPrice,
+      costPrice: item.costPrice != null && item.costPrice !== "" ? Number(item.costPrice) : null,
       amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
     }));
 
     const { subtotal, discountAmount, taxAmount, total } = calculateOrderTotals(
       computedItems,
-      {
-        type: financial?.discountType || order.financial.discountType,
-        value: financial?.discountValue ?? order.financial.discountValue,
-      },
-      {
-        type: financial?.taxType || order.financial.taxType,
-        rate: financial?.taxRate ?? order.financial.taxRate,
-      }
+      { type: financial?.discountType || order.financial.discountType, value: financial?.discountValue ?? order.financial.discountValue },
+      { type: financial?.taxType || order.financial.taxType, rate: financial?.taxRate ?? order.financial.taxRate }
     );
 
     order.items = computedItems;
@@ -256,7 +196,6 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
 
     const remaining = Math.round((total - order.payment.totalPaid) * 100) / 100;
     if (remaining < 0) throw ApiError.badRequest("Total paid exceeds new order total", "INVALID_PAYMENT");
-
     order.payment.remainingAmount = remaining;
     order.payment.status = getPaymentStatus(total, order.payment.totalPaid);
   }
@@ -269,39 +208,17 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
 /* ─── POST /api/v1/orders/:id/payments ───────────────────────────────── */
 export const recordPayment = asyncHandler(async (req, res) => {
   const { amount, method = "CASH", reference, note } = req.body;
+  if (!amount || amount <= 0) throw ApiError.badRequest("Payment amount must be greater than 0", "INVALID_AMOUNT");
 
-  if (!amount || amount <= 0) {
-    throw ApiError.badRequest("Payment amount must be greater than 0", "INVALID_AMOUNT");
-  }
-
-  const order = await Order.findOne({
-    _id: req.params.id,
-    businessId: req.user.businessId,
-    isDeleted: false,
-  });
-
+  const order = await Order.findOne({ _id: req.params.id, businessId: req.user.businessId, isDeleted: false });
   if (!order) throw ApiError.notFound("Order not found");
-  if (order.status === "CANCELLED") {
-    throw ApiError.badRequest("Cannot record payment for cancelled order", "ORDER_CANCELLED");
-  }
+  if (order.status === "CANCELLED") throw ApiError.badRequest("Cannot record payment for cancelled order", "ORDER_CANCELLED");
 
   const roundedAmount = Math.round(amount * 100) / 100;
+  if (roundedAmount > order.payment.remainingAmount)
+    throw ApiError.badRequest(`Payment of ₹${roundedAmount} exceeds remaining balance of ₹${order.payment.remainingAmount}`, "OVERPAYMENT");
 
-  if (roundedAmount > order.payment.remainingAmount) {
-    throw ApiError.badRequest(
-      `Payment of ₹${roundedAmount} exceeds remaining balance of ₹${order.payment.remainingAmount}`,
-      "OVERPAYMENT"
-    );
-  }
-
-  order.payment.transactions.push({
-    amount: roundedAmount,
-    method,
-    reference: reference || null,
-    note: note || null,
-    recordedAt: new Date(),
-  });
-
+  order.payment.transactions.push({ amount: roundedAmount, method, reference: reference || null, note: note || null, recordedAt: new Date() });
   order.payment.totalPaid = Math.round((order.payment.totalPaid + roundedAmount) * 100) / 100;
   order.payment.remainingAmount = Math.round((order.payment.remainingAmount - roundedAmount) * 100) / 100;
   order.payment.status = getPaymentStatus(order.financial.total, order.payment.totalPaid);
@@ -318,9 +235,7 @@ export const softDeleteOrder = asyncHandler(async (req, res) => {
     { isDeleted: true, deletedAt: new Date() },
     { new: true }
   ).lean();
-
   if (!order) throw ApiError.notFound("Order not found");
-
   await invalidateOrderCache(req.user.businessId);
   sendSuccess(res, null, "Order deleted successfully");
 });

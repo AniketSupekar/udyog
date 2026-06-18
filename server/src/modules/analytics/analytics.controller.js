@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
-import Product from "../../models/Product.js";
 import Expense from "../../models/Expense.js";
 import {
   getCache, setCache,
@@ -27,117 +26,124 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
     },
   };
 
-  const [revenueTrend, topClients, paymentBreakdown, collectionSummary, products, expensesByCategory, totalExpenses] =
-    await Promise.all([
-      Order.aggregate([
-        { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
-        addEffectiveDate,
-        { $match: { effectiveDate: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: { year: { $year: "$effectiveDate" }, month: { $month: "$effectiveDate" } },
-            revenue: { $sum: "$financial.total" },
-            collected: { $sum: "$payment.totalPaid" },
-            orders: { $sum: 1 },
-          },
+  const [
+    revenueTrend,
+    topClients,
+    paymentBreakdown,
+    collectionSummary,
+    cogsSummary,
+    expensesByCategory,
+    totalExpenses,
+  ] = await Promise.all([
+
+    // Revenue trend — 6 months
+    Order.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
+      addEffectiveDate,
+      { $match: { effectiveDate: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: { year: { $year: "$effectiveDate" }, month: { $month: "$effectiveDate" } },
+          revenue: { $sum: "$financial.total" },
+          collected: { $sum: "$payment.totalPaid" },
+          orders: { $sum: 1 },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-      ]),
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]),
 
-      Order.aggregate([
-        { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
-        {
-          $group: {
-            _id: "$clientSnapshot.name",
-            phone: { $first: "$clientSnapshot.phone" },
-            revenue: { $sum: "$financial.total" },
-            orders: { $sum: 1 },
-          },
+    // Top 5 clients
+    Order.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
+      {
+        $group: {
+          _id: "$clientSnapshot.name",
+          phone: { $first: "$clientSnapshot.phone" },
+          revenue: { $sum: "$financial.total" },
+          orders: { $sum: 1 },
         },
-        { $sort: { revenue: -1 } },
-        { $limit: 5 },
-      ]),
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 5 },
+    ]),
 
-      Order.aggregate([
-        { $match: { businessId: new mongoose.Types.ObjectId(businessId), isDeleted: false } },
-        { $unwind: "$payment.transactions" },
-        {
-          $group: {
-            _id: "$payment.transactions.method",
-            total: { $sum: "$payment.transactions.amount" },
-            count: { $sum: 1 },
-          },
+    // Payment method breakdown
+    Order.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), isDeleted: false } },
+      { $unwind: "$payment.transactions" },
+      {
+        $group: {
+          _id: "$payment.transactions.method",
+          total: { $sum: "$payment.transactions.amount" },
+          count: { $sum: 1 },
         },
-        { $sort: { total: -1 } },
-      ]),
+      },
+      { $sort: { total: -1 } },
+    ]),
 
-      Order.aggregate([
-        { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
-        addEffectiveDate,
-        { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
-        {
-          $group: {
-            _id: null,
-            totalRevenue: { $sum: "$financial.total" },
-            totalCollected: { $sum: "$payment.totalPaid" },
-            totalOrders: { $sum: 1 },
-          },
+    // This month revenue + collection
+    Order.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
+      addEffectiveDate,
+      { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$financial.total" },
+          totalCollected: { $sum: "$payment.totalPaid" },
+          totalOrders: { $sum: 1 },
         },
-      ]),
+      },
+    ]),
 
-      Product.find({ businessId, isActive: true, costPrice: { $ne: null, $gt: 0 } })
-        .select("name basePrice costPrice").lean(),
-
-      // Expenses by category this month
-      Expense.aggregate([
-        { $match: { businessId: new mongoose.Types.ObjectId(businessId), date: { $gte: monthStart, $lte: monthEnd } } },
-        {
-          $group: {
-            _id: "$category",
-            total: { $sum: "$amount" },
-            count: { $sum: 1 },
-          },
+    // COGS — read directly from order items costPrice (accurate per-order cost)
+    Order.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
+      addEffectiveDate,
+      { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
+      { $unwind: "$items" },
+      { $match: { "items.costPrice": { $ne: null, $gt: 0 } } },
+      {
+        $group: {
+          _id: null,
+          totalCOGS: { $sum: { $multiply: ["$items.costPrice", "$items.quantity"] } },
+          itemsWithCost: { $sum: 1 },
         },
-        { $sort: { total: -1 } },
-      ]),
+      },
+    ]),
 
-      // Total expenses this month
-      Expense.aggregate([
-        { $match: { businessId: new mongoose.Types.ObjectId(businessId), date: { $gte: monthStart, $lte: monthEnd } } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
-    ]);
+    // Expenses by category this month
+    Expense.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), date: { $gte: monthStart, $lte: monthEnd } } },
+      {
+        $group: {
+          _id: "$category",
+          total: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { total: -1 } },
+    ]),
 
-  // COGS calculation
-  const productCostMap = {};
-  products.forEach(p => {
-    productCostMap[p.name.toLowerCase()] = { basePrice: p.basePrice, costPrice: p.costPrice };
-  });
+    // Total expenses this month
+    Expense.aggregate([
+      { $match: { businessId: new mongoose.Types.ObjectId(businessId), date: { $gte: monthStart, $lte: monthEnd } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+  ]);
 
-  const thisMonthOrders = await Order.aggregate([
+  // Check if any items this month are missing costPrice — for partial data warning
+  const itemsWithoutCost = await Order.aggregate([
     { $match: { businessId: new mongoose.Types.ObjectId(businessId), status: "DELIVERED", isDeleted: false } },
     addEffectiveDate,
     { $match: { effectiveDate: { $gte: monthStart, $lte: monthEnd } } },
-    { $project: { items: 1 } },
+    { $unwind: "$items" },
+    { $match: { $or: [{ "items.costPrice": null }, { "items.costPrice": { $exists: false } }] } },
+    { $count: "count" },
   ]);
 
-  let totalCOGS = 0;
-  let itemsWithCost = 0;
-  let itemsWithoutCost = 0;
-
-  thisMonthOrders.forEach(order => {
-    order.items.forEach(item => {
-      const product = productCostMap[item.productName?.toLowerCase()];
-      if (product?.costPrice) {
-        totalCOGS += product.costPrice * item.quantity;
-        itemsWithCost++;
-      } else {
-        itemsWithoutCost++;
-      }
-    });
-  });
-
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
   const formattedTrend = revenueTrend.map((m) => ({
     month: `${MONTHS[m._id.month - 1]} ${m._id.year}`,
     shortMonth: MONTHS[m._id.month - 1],
@@ -148,14 +154,13 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
 
   const summary = collectionSummary[0] || { totalRevenue: 0, totalCollected: 0, totalOrders: 0 };
   const revenue = Math.round(summary.totalRevenue);
-  const cogs = Math.round(totalCOGS);
+  const cogs = Math.round(cogsSummary[0]?.totalCOGS || 0);
   const expenses = Math.round(totalExpenses[0]?.total || 0);
-
-  // Real profit = Revenue - COGS - Expenses
   const profit = revenue - cogs - expenses;
   const profitMargin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
   const collectionRate = revenue > 0 ? Math.round((summary.totalCollected / revenue) * 100) : 0;
-  const hasCostData = products.length > 0;
+  const hasCostData = (cogsSummary[0]?.itemsWithCost || 0) > 0;
+  const partialCostData = hasCostData && (itemsWithoutCost[0]?.count || 0) > 0;
 
   const data = {
     revenueTrend: formattedTrend,
@@ -182,7 +187,7 @@ export const getAnalyticsOverview = asyncHandler(async (req, res) => {
       profitMargin,
       hasCostData,
       hasExpenses: expenses > 0,
-      partialCostData: itemsWithoutCost > 0 && itemsWithCost > 0,
+      partialCostData,
     },
     expensesByCategory: expensesByCategory.map(e => ({
       category: e._id,
