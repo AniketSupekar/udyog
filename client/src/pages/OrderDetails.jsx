@@ -1,4 +1,3 @@
-// src/pages/OrderDetails.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchOrderById, updateOrderStatus, softDeleteOrder, updateOrderDetails } from "../services/order.api";
@@ -9,7 +8,7 @@ import RecordPaymentModal from "../components/payments/RecordPaymentModal";
 import { formatDate, toInputDate } from "../utils/date.util";
 import { formatCurrency } from "../utils/currency.util";
 import { getConfirmationUrl, getPaymentReminderUrl, getBillUrl } from "../utils/whatsapp.util";
-import { MessageCircle, Trash2, Edit2, X, Check, ChevronLeft, IndianRupee } from "lucide-react";
+import { MessageCircle, Trash2, Edit2, X, Check, ChevronLeft, IndianRupee, TrendingUp } from "lucide-react";
 
 const STATUS_TRANSITIONS = {
   CREATED: ["PENDING"],
@@ -38,9 +37,7 @@ export default function OrderDetails() {
   }, [id]);
 
   useEffect(() => {
-    getBusinessProfile()
-      .then(setBusiness)
-      .catch(console.error);
+    getBusinessProfile().then(setBusiness).catch(console.error);
   }, []);
 
   const businessName = business?.name || "My Business";
@@ -104,6 +101,19 @@ export default function OrderDetails() {
   const isEditable = !["DELIVERED", "CANCELLED"].includes(order.status) && !order.isDeleted;
   const nextStatuses = STATUS_TRANSITIONS[order.status] || [];
 
+  // Per-order profit calculation from line item costPrices
+  const orderCOGS = order.items?.reduce((sum, item) => {
+    if (item.costPrice != null && item.costPrice > 0) {
+      return sum + item.costPrice * item.quantity;
+    }
+    return sum;
+  }, 0) || 0;
+  const hasOrderCost = order.items?.some(i => i.costPrice != null && i.costPrice > 0);
+  const orderProfit = order.financial?.total - orderCOGS;
+  const orderMargin = order.financial?.total > 0
+    ? Math.round((orderProfit / order.financial.total) * 100)
+    : 0;
+
   return (
     <>
       <div className="page animate-in">
@@ -127,76 +137,110 @@ export default function OrderDetails() {
           </div>
         </div>
 
-        {/* ACTION BAR */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+        {/* ── PRIMARY ACTIONS ── */}
+        {/* Status progression — most important action, full width */}
+        {nextStatuses.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            {nextStatuses.map(s => (
+              <button
+                key={s}
+                disabled={statusLoading}
+                onClick={() => handleStatusChange(s)}
+                className="btn"
+                style={{
+                  width: "100%",
+                  padding: "13px",
+                  background: s === "DELIVERED" ? "var(--color-accent)" : "#F59E0B",
+                  color: "white",
+                  fontSize: "0.9375rem",
+                  fontWeight: 600,
+                  borderRadius: "var(--radius-lg)",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {statusLoading ? "Updating…" : `Mark as ${s}`}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Record payment — second most important */}
+        {order.payment?.remainingAmount > 0 && (
+          <button
+            onClick={() => setShowPaymentModal(true)}
+            style={{
+              width: "100%",
+              padding: "13px",
+              marginBottom: 10,
+              background: "#EFF6FF",
+              color: "#1D4ED8",
+              border: "1.5px solid #BFDBFE",
+              borderRadius: "var(--radius-lg)",
+              fontSize: "0.9375rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <IndianRupee size={16} /> Record Payment · {formatCurrency(order.payment.remainingAmount)} due
+          </button>
+        )}
+
+        {/* ── SECONDARY ACTIONS ── */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           {isEditable && !isEditing && (
-            <button className="btn btn-secondary btn-sm" onClick={handleEditStart}>
+            <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={handleEditStart}>
               <Edit2 size={14} /> Edit
             </button>
           )}
           {isEditing && (
             <>
-              <button className="btn btn-sm" style={{ background: "var(--color-accent)", color: "white" }} onClick={handleSave}>
+              <button
+                className="btn btn-sm"
+                style={{ flex: 1, background: "var(--color-accent)", color: "white" }}
+                onClick={handleSave}
+              >
                 <Check size={14} /> Save
               </button>
-              <button className="btn btn-secondary btn-sm" onClick={() => setIsEditing(false)}>
+              <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setIsEditing(false)}>
                 <X size={14} /> Cancel
               </button>
             </>
           )}
-          {nextStatuses.map(s => (
-            <button
-              key={s}
-              className="btn btn-sm"
-              disabled={statusLoading}
-              onClick={() => handleStatusChange(s)}
-              style={{ background: s === "DELIVERED" ? "var(--color-accent)" : "#F59E0B", color: "white" }}
-            >
-              {statusLoading ? "…" : `Mark ${s}`}
-            </button>
-          ))}
-          {order.payment?.remainingAmount > 0 && (
-            <button
-              className="btn btn-sm"
-              style={{ background: "#EFF6FF", color: "#1D4ED8", border: "1.5px solid #BFDBFE" }}
-              onClick={() => setShowPaymentModal(true)}
-            >
-              <IndianRupee size={14} /> Record Payment
-            </button>
-          )}
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowBill(true)}>
+          <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setShowBill(true)}>
             Bill
           </button>
           {isEditable && (
-            <button className="btn btn-danger btn-sm" style={{ marginLeft: "auto" }} onClick={handleDelete}>
-              <Trash2 size={14} /> Delete
+            <button className="btn btn-danger btn-sm" onClick={handleDelete}>
+              <Trash2 size={14} />
             </button>
           )}
         </div>
 
-        {/* WHATSAPP ROW */}
+        {/* WHATSAPP */}
         {order.clientSnapshot?.phone && (
           <div className="card" style={{ padding: "14px 16px", marginBottom: 12, background: "#F0FDF4", border: "1.5px solid #BBF7D0" }}>
             <p className="section-label" style={{ marginBottom: 10 }}>Send on WhatsApp</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <WhatsAppBtn
                 label="Confirmation"
-                color="#15803D"
-                bg="#DCFCE7"
+                color="#15803D" bg="#DCFCE7"
                 onClick={() => getConfirmationUrl(order, businessName)}
               />
               {order.payment?.remainingAmount > 0 && (
                 <WhatsAppBtn
                   label="Pay Reminder"
-                  color="#B45309"
-                  bg="#FEF9C3"
+                  color="#B45309" bg="#FEF9C3"
                   onClick={() => getPaymentReminderUrl(order, businessName, business?.upiId)}
                 />
               )}
               <WhatsAppBtn
                 label="Bill"
-                color="#1D4ED8"
-                bg="#DBEAFE"
+                color="#1D4ED8" bg="#DBEAFE"
                 onClick={() => getBillUrl(order, businessName, business?.upiId)}
               />
             </div>
@@ -248,21 +292,83 @@ export default function OrderDetails() {
         <div className="card" style={{ padding: "16px", marginBottom: 12 }}>
           <p className="section-label">Order Items</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {order.items?.map((item, i) => (
-              <div
-                key={i}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.items.length - 1 ? "1px solid var(--color-border)" : "none" }}
-              >
-                <div>
-                  <p style={{ fontWeight: 500, fontSize: "0.9375rem", color: "var(--color-text-primary)" }}>{item.productName}</p>
-                  <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>
-                    {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
-                  </p>
+            {order.items?.map((item, i) => {
+              const itemMargin = item.costPrice > 0
+                ? Math.round(((item.unitPrice - item.costPrice) / item.unitPrice) * 100)
+                : null;
+              const itemProfit = item.costPrice > 0
+                ? (item.unitPrice - item.costPrice) * item.quantity
+                : null;
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    padding: "12px 0",
+                    borderBottom: i < order.items.length - 1 ? "1px solid var(--color-border)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: 500, fontSize: "0.9375rem", color: "var(--color-text-primary)" }}>
+                        {item.productName}
+                      </p>
+                      <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>
+                        {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
+                      </p>
+                      {item.costPrice > 0 && (
+                        <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                          Cost: {formatCurrency(item.costPrice)} / {item.unit}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <p className="amount" style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
+                        {formatCurrency(item.amount)}
+                      </p>
+                      {itemMargin !== null && (
+                        <span style={{
+                          display: "inline-block",
+                          marginTop: 4,
+                          fontSize: "0.6875rem",
+                          fontWeight: 600,
+                          padding: "2px 7px",
+                          borderRadius: 4,
+                          background: itemMargin >= 20 ? "#F0FDF4" : itemMargin >= 0 ? "#FFFBEB" : "#FEF2F2",
+                          color: itemMargin >= 20 ? "#15803D" : itemMargin >= 0 ? "#B45309" : "#B91C1C",
+                        }}>
+                          {itemMargin}% · +{formatCurrency(itemProfit)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <p className="amount" style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{formatCurrency(item.amount)}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {/* Order-level profit summary */}
+          {hasOrderCost && (
+            <div style={{
+              marginTop: 12,
+              padding: "10px 12px",
+              background: orderProfit >= 0 ? "#F0FDF4" : "#FEF2F2",
+              borderRadius: "var(--radius-md)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <TrendingUp size={14} color={orderProfit >= 0 ? "#15803D" : "#B91C1C"} />
+                <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: orderProfit >= 0 ? "#15803D" : "#B91C1C" }}>
+                  Order Profit
+                </span>
+              </div>
+              <span style={{ fontSize: "0.875rem", fontWeight: 700, color: orderProfit >= 0 ? "#15803D" : "#B91C1C" }}>
+                {formatCurrency(orderProfit)} ({orderMargin}%)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* PAYMENT SUMMARY */}
@@ -299,7 +405,11 @@ export default function OrderDetails() {
             {order.payment.transactions.map((txn, i) => (
               <div
                 key={i}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < order.payment.transactions.length - 1 ? "1px solid var(--color-border)" : "none" }}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "10px 0",
+                  borderBottom: i < order.payment.transactions.length - 1 ? "1px solid var(--color-border)" : "none",
+                }}
               >
                 <div>
                   <p style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--color-text-primary)" }}>{txn.method}</p>
@@ -307,7 +417,9 @@ export default function OrderDetails() {
                     {formatDate(txn.recordedAt)}{txn.note ? ` · ${txn.note}` : ""}
                   </p>
                 </div>
-                <p className="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>{formatCurrency(txn.amount)}</p>
+                <p className="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>
+                  {formatCurrency(txn.amount)}
+                </p>
               </div>
             ))}
           </div>
@@ -325,13 +437,7 @@ export default function OrderDetails() {
         )}
       </div>
 
-      {showBill && (
-        <BillModal
-          order={order}
-          onClose={() => setShowBill(false)}
-          business={business}
-        />
-      )}
+      {showBill && <BillModal order={order} onClose={() => setShowBill(false)} business={business} />}
       {showPaymentModal && (
         <RecordPaymentModal
           order={order}
