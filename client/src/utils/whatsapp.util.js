@@ -1,6 +1,3 @@
-// src/utils/whatsapp.util.js
-
-// Backend base URL — strips /api to get root, then /api/pay is appended
 const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/, "");
 
 const formatINR = (amount = 0) =>
@@ -17,17 +14,14 @@ const formatDate = (date) =>
     year: "numeric",
   });
 
-// Encodes message preserving line breaks for WhatsApp
 const openWhatsApp = (phone, lines) => {
   const digits = phone.replace(/\D/g, "");
   const normalized = digits.startsWith("91") ? digits : `91${digits}`;
-  // Join with %0A — WhatsApp renders this as real line breaks
   const encoded = lines.map(l => encodeURIComponent(l)).join("%0A");
   const url = `https://wa.me/${normalized}?text=${encoded}`;
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
-// Builds https pay link → backend redirects to upi:// deep link
 const buildUpiLink = (upiId, businessName, amount) => {
   if (!upiId?.trim() || Number(amount) <= 0) return null;
   const params = new URLSearchParams({
@@ -38,6 +32,14 @@ const buildUpiLink = (upiId, businessName, amount) => {
   });
   return `${BACKEND_URL}/api/pay?${params.toString()}`;
 };
+
+// ── Automated footer — appended to every message ──────────────────────────
+const buildFooter = (businessName) => [
+  ``,
+  `────────────────`,
+  `• This is an automated message from ${businessName}'s order management system.`,
+  // `Powered by Udyog`,
+];
 
 export const getConfirmationUrl = (order, businessName) => {
   const phone = order.clientSnapshot?.phone;
@@ -64,6 +66,7 @@ export const getConfirmationUrl = (order, businessName) => {
     ``,
     `Thank you for your order! 🙏`,
     `— ${businessName}`,
+    ...buildFooter(businessName),
   ]);
 };
 
@@ -96,6 +99,7 @@ export const getPaymentReminderUrl = (order, businessName, upiId = null) => {
   lines.push(`Please clear the balance at your earliest convenience.`);
   lines.push(`Thank you 🙏`);
   lines.push(`— ${businessName}`);
+  lines.push(...buildFooter(businessName));
 
   openWhatsApp(phone, lines);
 };
@@ -139,6 +143,7 @@ export const getBillUrl = (order, businessName, upiId = null) => {
   lines.push(``);
   lines.push(`Thank you for your business! 🙏`);
   lines.push(`— ${businessName}`);
+  lines.push(...buildFooter(businessName));
 
   openWhatsApp(phone, lines);
 };
