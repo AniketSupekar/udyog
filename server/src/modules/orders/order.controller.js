@@ -7,8 +7,9 @@ import { sendSuccess, sendCreated, sendPaginated } from "../../utils/ApiResponse
 import { calculateOrderTotals, getPaymentStatus } from "../../utils/calculations.js";
 
 const STATUS_TRANSITIONS = {
-  CREATED: ["PENDING", "CANCELLED"],
-  PENDING: ["DELIVERED", "CANCELLED"],
+  QUOTE:     ["CREATED", "CANCELLED"],
+  CREATED:   ["PENDING", "CANCELLED"],
+  PENDING:   ["DELIVERED", "CANCELLED"],
   DELIVERED: [],
   CANCELLED: [],
 };
@@ -16,12 +17,18 @@ const STATUS_TRANSITIONS = {
 /* ─── POST /api/v1/orders ─────────────────────────────────────────────── */
 export const createOrder = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const { clientSnapshot, clientId, orderDate, deliveryDate, items, financial, advancePaid = 0, notes } = req.body;
+  const {
+    clientSnapshot, clientId, orderDate, deliveryDate,
+    items, financial, advancePaid = 0, notes,
+    isQuote = false, // new flag
+  } = req.body;
 
   if (!clientSnapshot?.name || !clientSnapshot?.phone)
     throw ApiError.badRequest("Customer name and phone are required", "MISSING_CLIENT");
-  if (!orderDate || !deliveryDate)
-    throw ApiError.badRequest("Order date and delivery date are required", "MISSING_DATES");
+  if (!orderDate)
+    throw ApiError.badRequest("Order date is required", "MISSING_DATES");
+  if (!isQuote && !deliveryDate)
+    throw ApiError.badRequest("Delivery date is required", "MISSING_DATES");
   if (!items || !Array.isArray(items) || items.length === 0)
     throw ApiError.badRequest("Order must have at least one item", "MISSING_ITEMS");
 
@@ -33,9 +40,10 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 
   const oDate = new Date(orderDate);
-  const dDate = new Date(deliveryDate);
-  if (isNaN(oDate.getTime()) || isNaN(dDate.getTime()))
-    throw ApiError.badRequest("Invalid date format", "INVALID_DATE");
+  if (isNaN(oDate.getTime())) throw ApiError.badRequest("Invalid date format", "INVALID_DATE");
+
+  const dDate = deliveryDate ? new Date(deliveryDate) : null;
+  if (dDate && isNaN(dDate.getTime())) throw ApiError.badRequest("Invalid delivery date", "INVALID_DATE");
 
   const computedItems = items.map((item) => ({
     productName: item.productName.trim(),
@@ -83,21 +91,31 @@ export const createOrder = asyncHandler(async (req, res) => {
       transactions: advance > 0 ? [{ amount: advance, method: "CASH", note: "Advance payment" }] : [],
     },
     notes: notes || null,
-    status: "CREATED",
+    status: isQuote ? "QUOTE" : "CREATED",
   });
 
   await invalidateOrderCache(businessId);
-  sendCreated(res, order, "Order created successfully");
+  sendCreated(res, order, isQuote ? "Quote created successfully" : "Order created successfully");
 });
 
 /* ─── GET /api/v1/orders ──────────────────────────────────────────────── */
 export const getAllOrders = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
-  const { page = 1, limit = 10, search = "", status, paymentStatus, filter, source, showDeleted = "false" } = req.query;
+  const {
+    page = 1, limit = 15, search = "",
+    status, paymentStatus, filter,
+    source, showDeleted = "false",
+    showQuotes = "false",
+  } = req.query;
 
   const query = { businessId };
   if (showDeleted !== "true") query.isDeleted = false;
-  if (status) query.status = status;
+  if (status) {
+    query.status = status;
+  } else if (showQuotes !== "true") {
+    // By default exclude QUOTE from main orders list
+    query.status = { $ne: "QUOTE" };
+  }
   if (paymentStatus) query["payment.status"] = paymentStatus;
   if (source) query.source = source;
   if (search.trim()) query["clientSnapshot.name"] = { $regex: search.trim(), $options: "i" };
@@ -107,7 +125,10 @@ export const getAllOrders = asyncHandler(async (req, res) => {
 
   if (filter === "due-today") query.deliveryDate = { $gte: today, $lte: endOfToday };
   else if (filter === "upcoming") query.deliveryDate = { $gt: endOfToday };
-  else if (filter === "overdue") { query.deliveryDate = { $lt: today }; query.status = { $nin: ["DELIVERED", "CANCELLED"] }; }
+  else if (filter === "overdue") {
+    query.deliveryDate = { $lt: today };
+    query.status = { $nin: ["DELIVERED", "CANCELLED", "QUOTE"] };
+  }
 
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
@@ -126,7 +147,11 @@ export const getOrderById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id))
     throw ApiError.badRequest("Invalid order ID", "INVALID_ID");
 
-  const order = await Order.findOne({ _id: req.params.id, businessId: req.user.businessId, isDeleted: false }).lean();
+  const order = await Order.findOne({
+    _id: req.params.id,
+    businessId: req.user.businessId,
+    isDeleted: false,
+  }).lean();
   if (!order) throw ApiError.notFound("Order not found");
   sendSuccess(res, order);
 });
@@ -136,7 +161,11 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!status) throw ApiError.badRequest("Status is required", "MISSING_STATUS");
 
-  const order = await Order.findOne({ _id: req.params.id, businessId: req.user.businessId, isDeleted: false });
+  const order = await Order.findOne({
+    _id: req.params.id,
+    businessId: req.user.businessId,
+    isDeleted: false,
+  });
   if (!order) throw ApiError.notFound("Order not found");
 
   const allowed = STATUS_TRANSITIONS[order.status];
@@ -163,7 +192,7 @@ export const updateOrderDetails = asyncHandler(async (req, res) => {
 
   if (clientSnapshot) order.clientSnapshot = { ...order.clientSnapshot, ...clientSnapshot };
   if (orderDate) order.orderDate = new Date(orderDate);
-  if (deliveryDate) order.deliveryDate = new Date(deliveryDate);
+  if (deliveryDate !== undefined) order.deliveryDate = deliveryDate ? new Date(deliveryDate) : null;
   if (notes !== undefined) order.notes = notes;
 
   if (items && Array.isArray(items) && items.length > 0) {
@@ -210,9 +239,14 @@ export const recordPayment = asyncHandler(async (req, res) => {
   const { amount, method = "CASH", reference, note } = req.body;
   if (!amount || amount <= 0) throw ApiError.badRequest("Payment amount must be greater than 0", "INVALID_AMOUNT");
 
-  const order = await Order.findOne({ _id: req.params.id, businessId: req.user.businessId, isDeleted: false });
+  const order = await Order.findOne({
+    _id: req.params.id,
+    businessId: req.user.businessId,
+    isDeleted: false,
+  });
   if (!order) throw ApiError.notFound("Order not found");
   if (order.status === "CANCELLED") throw ApiError.badRequest("Cannot record payment for cancelled order", "ORDER_CANCELLED");
+  if (order.status === "QUOTE") throw ApiError.badRequest("Cannot record payment for a quote", "QUOTE_NOT_ORDER");
 
   const roundedAmount = Math.round(amount * 100) / 100;
   if (roundedAmount > order.payment.remainingAmount)
@@ -238,4 +272,26 @@ export const softDeleteOrder = asyncHandler(async (req, res) => {
   if (!order) throw ApiError.notFound("Order not found");
   await invalidateOrderCache(req.user.businessId);
   sendSuccess(res, null, "Order deleted successfully");
+});
+
+/* ─── PATCH /api/v1/orders/:id/convert ───────────────────────────────── */
+// Convert a QUOTE to a real CREATED order — requires delivery date
+export const convertQuoteToOrder = asyncHandler(async (req, res) => {
+  const { deliveryDate } = req.body;
+  if (!deliveryDate) throw ApiError.badRequest("Delivery date is required to confirm order", "MISSING_DATES");
+
+  const order = await Order.findOne({
+    _id: req.params.id,
+    businessId: req.user.businessId,
+    status: "QUOTE",
+    isDeleted: false,
+  });
+  if (!order) throw ApiError.notFound("Quote not found");
+
+  order.status = "CREATED";
+  order.deliveryDate = new Date(deliveryDate);
+  await order.save();
+
+  await invalidateOrderCache(req.user.businessId);
+  sendSuccess(res, order, "Quote converted to order successfully");
 });

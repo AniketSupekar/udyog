@@ -6,7 +6,7 @@ const lineItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: [0.01, "Quantity must be greater than 0"] },
     unit: { type: String, trim: true, default: "piece" },
     unitPrice: { type: Number, required: true, min: [0, "Unit price cannot be negative"] },
-    costPrice: { type: Number, default: null, min: 0 }, // purchase cost for this specific order
+    costPrice: { type: Number, default: null, min: 0 },
     amount: { type: Number, required: true },
     notes: { type: String, trim: true, default: null },
   },
@@ -68,7 +68,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["CREATED", "PENDING", "DELIVERED", "CANCELLED"],
+      enum: ["QUOTE", "CREATED", "PENDING", "DELIVERED", "CANCELLED"],
       default: "CREATED",
     },
     source: {

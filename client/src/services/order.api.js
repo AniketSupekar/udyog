@@ -34,3 +34,8 @@ export const softDeleteOrder = async (id) => {
   const { data } = await api.delete(`/orders/${id}`);
   return data;
 };
+
+export const convertQuoteToOrder = async (id, deliveryDate) => {
+  const { data } = await api.patch(`/orders/${id}/convert`, { deliveryDate });
+  return data.data;
+};

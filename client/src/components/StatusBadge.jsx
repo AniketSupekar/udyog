@@ -1,5 +1,5 @@
-// src/components/StatusBadge.jsx
 const CONFIG = {
+  QUOTE:     { label: "Quote",     bg: "#F5F3FF", color: "#6D28D9" },
   CREATED:   { label: "Created",   bg: "#EFF6FF", color: "#1D4ED8" },
   PENDING:   { label: "Pending",   bg: "#FFFBEB", color: "#B45309" },
   DELIVERED: { label: "Delivered", bg: "#F0FDF4", color: "#15803D" },
@@ -11,12 +11,8 @@ const CONFIG = {
 
 export default function StatusBadge({ status }) {
   const cfg = CONFIG[status] || { label: status, bg: "#F3F4F6", color: "#4B5563" };
-
   return (
-    <span
-      className="badge"
-      style={{ background: cfg.bg, color: cfg.color }}
-    >
+    <span className="badge" style={{ background: cfg.bg, color: cfg.color }}>
       {cfg.label}
     </span>
   );

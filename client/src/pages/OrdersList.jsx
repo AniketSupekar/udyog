@@ -1,17 +1,17 @@
-// src/pages/OrdersList.jsx
 import { useEffect, useState, useRef } from "react";
 import { fetchOrders } from "../services/order.api";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
-import { Search, Plus, X, SlidersHorizontal, Phone, Store } from "lucide-react";
+import { Search, Plus, X, SlidersHorizontal, Phone, Store, FileText } from "lucide-react";
 import { formatDate } from "../utils/date.util";
 import { formatCurrency } from "../utils/currency.util";
 
 const STATUS_FILTERS = ["", "CREATED", "PENDING", "DELIVERED", "CANCELLED"];
 
 const STATUS_BORDER = {
-  CREATED: "#6366F1",
-  PENDING: "#D97706",
+  QUOTE:     "#6D28D9",
+  CREATED:   "#6366F1",
+  PENDING:   "#D97706",
   DELIVERED: "#16A34A",
   CANCELLED: "#9CA3AF",
 };
@@ -29,11 +29,13 @@ export default function OrdersList() {
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
-  const [sourceTab, setSourceTab] = useState("ALL"); // "ALL" | "STOREFRONT"
+  const [activeTab, setActiveTab] = useState("ALL"); // "ALL" | "STOREFRONT" | "QUOTES"
   const [storefrontCount, setStorefrontCount] = useState(null);
+  const [quotesCount, setQuotesCount] = useState(null);
   const debounceRef = useRef(null);
 
   const isDashboardView = Boolean(filter || status);
+
   const contextTitle = filter === "overdue" ? "Overdue Orders"
     : filter === "due-today" ? "Due Today"
     : filter === "upcoming" ? "Upcoming Orders"
@@ -48,22 +50,28 @@ export default function OrdersList() {
 
   useEffect(() => {
     setLoading(true);
-    const source = sourceTab === "STOREFRONT" ? "STOREFRONT" : undefined;
-    fetchOrders({ page, limit: 15, search: debouncedSearch, status, filter, source })
+    const params = { page, limit: 15, search: debouncedSearch, status, filter };
+    if (activeTab === "STOREFRONT") params.source = "STOREFRONT";
+    if (activeTab === "QUOTES") params.status = "QUOTE";
+
+    fetchOrders(params)
       .then(res => { setOrders(res.data || []); setPagination(res.pagination); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [debouncedSearch, status, filter, page, sourceTab]);
+  }, [debouncedSearch, status, filter, page, activeTab]);
 
-  // Fetch storefront count badge once on mount
+  // Badge counts
   useEffect(() => {
     fetchOrders({ page: 1, limit: 1, source: "STOREFRONT", status: "CREATED" })
       .then(res => setStorefrontCount(res.pagination?.total || 0))
       .catch(() => {});
+    fetchOrders({ page: 1, limit: 1, status: "QUOTE" })
+      .then(res => setQuotesCount(res.pagination?.total || 0))
+      .catch(() => {});
   }, []);
 
   const handleTabChange = (tab) => {
-    setSourceTab(tab);
+    setActiveTab(tab);
     setPage(1);
     setSearch("");
   };
@@ -81,7 +89,7 @@ export default function OrdersList() {
           <div>
             <h1 className="page-title">{contextTitle || "Orders"}</h1>
             <p className="page-subtitle">
-              {pagination?.total != null ? `${pagination.total} order${pagination.total !== 1 ? "s" : ""}` : "Manage all customer orders"}
+              {pagination?.total != null ? `${pagination.total} ${activeTab === "QUOTES" ? "quote" : "order"}${pagination.total !== 1 ? "s" : ""}` : "Manage all customer orders"}
             </p>
           </div>
           {!isDashboardView && (
@@ -92,61 +100,48 @@ export default function OrdersList() {
         </div>
       </div>
 
-      {/* SOURCE TABS — only show when not in dashboard filter view */}
+      {/* TABS */}
       {!isDashboardView && (
-        <div style={{ display: "flex", gap: 0, marginBottom: 14, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: 3, width: "fit-content" }}>
-          <button
-            onClick={() => handleTabChange("ALL")}
-            style={{
-              padding: "6px 14px",
-              fontSize: "0.8125rem",
-              fontWeight: sourceTab === "ALL" ? 600 : 400,
-              color: sourceTab === "ALL" ? "white" : "var(--color-text-secondary)",
-              background: sourceTab === "ALL" ? "var(--color-cta)" : "transparent",
-              border: "none",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              transition: "all 0.15s",
-              fontFamily: "var(--font-sans)",
-            }}
-          >
-            All Orders
-          </button>
-          <button
-            onClick={() => handleTabChange("STOREFRONT")}
-            style={{
-              padding: "6px 14px",
-              fontSize: "0.8125rem",
-              fontWeight: sourceTab === "STOREFRONT" ? 600 : 400,
-              color: sourceTab === "STOREFRONT" ? "white" : "var(--color-text-secondary)",
-              background: sourceTab === "STOREFRONT" ? "var(--color-accent)" : "transparent",
-              border: "none",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              transition: "all 0.15s",
-              fontFamily: "var(--font-sans)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Store size={13} />
-            Store Orders
-            {storefrontCount > 0 && (
-              <span style={{
-                background: sourceTab === "STOREFRONT" ? "rgba(255,255,255,0.25)" : "var(--color-accent)",
-                color: "white",
-                fontSize: "0.625rem",
-                fontWeight: 700,
-                padding: "1px 5px",
-                borderRadius: 99,
-                minWidth: 16,
-                textAlign: "center",
-              }}>
-                {storefrontCount}
-              </span>
-            )}
-          </button>
+        <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }}>
+          {[
+            { key: "ALL", label: "All Orders", icon: null, count: null, activeColor: "var(--color-cta)" },
+            { key: "STOREFRONT", label: "Store", icon: <Store size={12} />, count: storefrontCount, activeColor: "var(--color-accent)" },
+            { key: "QUOTES", label: "Quotes", icon: <FileText size={12} />, count: quotesCount, activeColor: "#6D28D9" },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChange(tab.key)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "7px 14px",
+                fontSize: "0.8125rem",
+                fontWeight: activeTab === tab.key ? 600 : 400,
+                color: activeTab === tab.key ? "white" : "var(--color-text-secondary)",
+                background: activeTab === tab.key ? tab.activeColor : "var(--color-surface)",
+                border: `1.5px solid ${activeTab === tab.key ? tab.activeColor : "var(--color-border)"}`,
+                borderRadius: "var(--radius-full)",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                fontFamily: "var(--font-sans)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {tab.icon}
+              {tab.label}
+              {tab.count > 0 && (
+                <span style={{
+                  background: activeTab === tab.key ? "rgba(255,255,255,0.25)" : tab.activeColor,
+                  color: "white",
+                  fontSize: "0.625rem", fontWeight: 700,
+                  padding: "1px 5px", borderRadius: 99,
+                  minWidth: 16, textAlign: "center",
+                }}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       )}
 
@@ -168,17 +163,19 @@ export default function OrdersList() {
             </button>
           )}
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="btn btn-icon btn-secondary"
-          style={{ borderColor: showFilters ? "var(--color-accent)" : "var(--color-border)", color: showFilters ? "var(--color-accent)" : "var(--color-text-secondary)" }}
-        >
-          <SlidersHorizontal size={17} />
-        </button>
+        {activeTab !== "QUOTES" && (
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="btn btn-icon btn-secondary"
+            style={{ borderColor: showFilters ? "var(--color-accent)" : "var(--color-border)", color: showFilters ? "var(--color-accent)" : "var(--color-text-secondary)" }}
+          >
+            <SlidersHorizontal size={17} />
+          </button>
+        )}
       </div>
 
       {/* FILTER PANEL */}
-      {showFilters && (
+      {showFilters && activeTab !== "QUOTES" && (
         <div className="card animate-in" style={{ padding: "14px 16px", marginBottom: 14 }}>
           <p className="section-label">Filter by Status</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -214,14 +211,23 @@ export default function OrdersList() {
       ) : orders.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">
-            <Search size={20} color="var(--color-text-tertiary)" />
+            {activeTab === "QUOTES" ? <FileText size={20} color="var(--color-text-tertiary)" /> : <Search size={20} color="var(--color-text-tertiary)" />}
           </div>
           <p style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
-            {sourceTab === "STOREFRONT" ? "No store orders yet" : "No orders found"}
+            {activeTab === "STOREFRONT" ? "No store orders yet"
+              : activeTab === "QUOTES" ? "No quotes yet"
+              : "No orders found"}
           </p>
           <p style={{ fontSize: "0.875rem", marginTop: 4 }}>
-            {sourceTab === "STOREFRONT" ? "Orders from your public storefront will appear here" : "Try adjusting your search or filters"}
+            {activeTab === "STOREFRONT" ? "Orders from your public storefront will appear here"
+              : activeTab === "QUOTES" ? "Create a quote to send a price estimate to a customer"
+              : "Try adjusting your search or filters"}
           </p>
+          {activeTab === "QUOTES" && (
+            <Link to="/orders/create" className="btn btn-primary btn-sm" style={{ marginTop: 16 }}>
+              <Plus size={15} /> Create Quote
+            </Link>
+          )}
         </div>
       ) : (
         <>
@@ -229,11 +235,12 @@ export default function OrdersList() {
             {orders.map(order => {
               const borderColor = STATUS_BORDER[order.status] || "var(--color-border-strong)";
               const isStorefront = order.source === "STOREFRONT";
+              const isQuote = order.status === "QUOTE";
               return (
                 <Link key={order._id} to={`/orders/${order._id}`} style={{ textDecoration: "none" }}>
                   <div
                     style={{
-                      background: "var(--color-surface)",
+                      background: isQuote ? "#FAFAFF" : "var(--color-surface)",
                       border: "1.5px solid var(--color-border)",
                       borderLeft: `3px solid ${borderColor}`,
                       borderRadius: "var(--radius-xl)",
@@ -251,16 +258,7 @@ export default function OrdersList() {
                             {order.clientSnapshot?.name}
                           </p>
                           {isStorefront && (
-                            <span style={{
-                              flexShrink: 0,
-                              display: "inline-flex", alignItems: "center", gap: 3,
-                              fontSize: "0.5625rem", fontWeight: 700,
-                              background: "var(--color-accent-light)",
-                              color: "var(--color-accent)",
-                              padding: "2px 6px", borderRadius: 4,
-                              letterSpacing: "0.03em",
-                              border: "1px solid #C7D2FE",
-                            }}>
+                            <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 3, fontSize: "0.5625rem", fontWeight: 700, background: "var(--color-accent-light)", color: "var(--color-accent)", padding: "2px 6px", borderRadius: 4, border: "1px solid #C7D2FE" }}>
                               <Store size={9} /> STORE
                             </span>
                           )}
@@ -274,9 +272,14 @@ export default function OrdersList() {
                     <div style={{ height: 1, background: "var(--color-border)", margin: "10px 0" }} />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                       <div>
-                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Delivery</p>
+                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                          {isQuote ? "Created" : "Delivery"}
+                        </p>
                         <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-primary)" }}>
-                          {order.deliveryDate ? formatDate(order.deliveryDate) : "—"}
+                          {isQuote
+                            ? formatDate(order.createdAt)
+                            : order.deliveryDate ? formatDate(order.deliveryDate) : "—"
+                          }
                         </p>
                       </div>
                       <div>
@@ -284,10 +287,16 @@ export default function OrdersList() {
                         <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 500 }}>{formatCurrency(order.financial?.total)}</p>
                       </div>
                       <div>
-                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Balance</p>
-                        <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 600, color: order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
-                          {order.payment?.remainingAmount > 0 ? formatCurrency(order.payment?.remainingAmount) : "Paid ✓"}
+                        <p style={{ fontSize: "0.6875rem", color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+                          {isQuote ? "Status" : "Balance"}
                         </p>
+                        {isQuote ? (
+                          <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#6D28D9" }}>Pending</p>
+                        ) : (
+                          <p className="amount" style={{ fontSize: "0.8125rem", fontWeight: 600, color: order.payment?.remainingAmount > 0 ? "var(--color-danger)" : "var(--color-success)" }}>
+                            {order.payment?.remainingAmount > 0 ? formatCurrency(order.payment?.remainingAmount) : "Paid ✓"}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

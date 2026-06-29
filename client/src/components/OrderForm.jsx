@@ -35,7 +35,6 @@ export default function OrderForm() {
         productName: product.name,
         quantity: "1",
         unitPrice: String(product.basePrice),
-        // Auto-fill cost price from catalog if available
         costPrice: product.costPrice != null ? String(product.costPrice) : "",
         unit: product.unit,
       };
@@ -51,36 +50,44 @@ export default function OrderForm() {
     setItems(updated);
   };
 
-  const subtotal = items.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
+  const subtotal = items.reduce((sum, item) =>
+    sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
   const remaining = subtotal - (parseFloat(advancePaid) || 0);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
+  const validate = (isQuote) => {
     for (let i = 0; i < items.length; i++) {
-      if (!items[i].productName.trim()) { setError(`Item ${i+1}: product name required`); return; }
-      if (!items[i].quantity || parseFloat(items[i].quantity) <= 0) { setError(`Item ${i+1}: quantity must be > 0`); return; }
-      if (items[i].unitPrice === "" || parseFloat(items[i].unitPrice) < 0) { setError(`Item ${i+1}: price required`); return; }
+      if (!items[i].productName.trim()) { setError(`Item ${i+1}: product name required`); return false; }
+      if (!items[i].quantity || parseFloat(items[i].quantity) <= 0) { setError(`Item ${i+1}: quantity must be > 0`); return false; }
+      if (items[i].unitPrice === "" || parseFloat(items[i].unitPrice) < 0) { setError(`Item ${i+1}: price required`); return false; }
     }
-    if (remaining < 0) { setError("Advance cannot exceed total"); return; }
+    if (!isQuote && !deliveryDate) { setError("Delivery date is required for orders"); return false; }
+    if (remaining < 0) { setError("Advance cannot exceed total"); return false; }
+    return true;
+  };
+
+  const handleSubmit = async (isQuote = false) => {
+    setError("");
+    if (!validate(isQuote)) return;
     setLoading(true);
     try {
       await createOrder({
-        clientSnapshot, orderDate, deliveryDate,
+        clientSnapshot,
+        orderDate,
+        deliveryDate: deliveryDate || undefined,
         items: items.map(i => ({
           productName: i.productName.trim(),
           quantity: parseFloat(i.quantity),
           unitPrice: parseFloat(i.unitPrice),
           unit: i.unit || "piece",
-          // Only send costPrice if user actually entered something
           costPrice: i.costPrice !== "" && i.costPrice != null ? parseFloat(i.costPrice) : null,
         })),
         advancePaid: parseFloat(advancePaid) || 0,
         notes: notes.trim() || undefined,
+        isQuote,
       });
-      navigate("/orders");
+      navigate(isQuote ? "/orders?showQuotes=true" : "/orders");
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create order");
+      setError(err.response?.data?.message || "Failed to create");
     } finally {
       setLoading(false);
     }
@@ -94,7 +101,7 @@ export default function OrderForm() {
         <p className="page-subtitle">Fill in the details below</p>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {error && (
           <div style={{ background: "var(--color-danger-light)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", padding: "12px 16px", fontSize: "0.875rem", fontWeight: 500 }}>
             {error}
@@ -120,8 +127,11 @@ export default function OrderForm() {
               <input type="date" className="input" value={orderDate} readOnly style={{ background: "var(--color-bg)" }} />
             </div>
             <div>
-              <p style={{ fontSize: "0.75rem", color: "var(--color-text-secondary)", marginBottom: 6 }}>Delivery Date *</p>
-              <input type="date" className="input" required value={deliveryDate} min={orderDate} onChange={e => setDeliveryDate(e.target.value)} />
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-secondary)", marginBottom: 6 }}>
+                Delivery Date
+                <span style={{ color: "var(--color-text-tertiary)", fontWeight: 400 }}> (optional for quotes)</span>
+              </p>
+              <input type="date" className="input" value={deliveryDate} min={orderDate} onChange={e => setDeliveryDate(e.target.value)} />
             </div>
           </div>
         </div>
@@ -147,11 +157,7 @@ export default function OrderForm() {
                   onMouseLeave={e => e.currentTarget.style.background = "none"}>
                   <div style={{ textAlign: "left" }}>
                     <span style={{ fontWeight: 500, fontSize: "0.9rem", display: "block" }}>{p.name}</span>
-                    {p.costPrice && (
-                      <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>
-                        Cost: {formatCurrency(p.costPrice)}
-                      </span>
-                    )}
+                    {p.costPrice && <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>Cost: {formatCurrency(p.costPrice)}</span>}
                   </div>
                   <span className="amount" style={{ fontSize: "0.875rem", color: "var(--color-accent)" }}>{formatCurrency(p.basePrice)}/{p.unit}</span>
                 </button>
@@ -170,21 +176,15 @@ export default function OrderForm() {
                   </select>
                   <input className="input" type="number" placeholder="₹ Sell" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(index, "unitPrice", e.target.value)} required />
                 </div>
-
-                {/* Cost price — optional, for profit tracking */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    className="input"
-                    type="number"
-                    placeholder="₹ Cost (optional - for profit tracking)"
-                    min="0"
-                    step="0.01"
-                    value={item.costPrice}
-                    onChange={e => updateItem(index, "costPrice", e.target.value)}
-                    style={{ fontSize: "0.8125rem", background: "var(--color-surface)" }}
-                  />
-                </div>
-
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="₹ Cost (optional — for profit tracking)"
+                  min="0" step="0.01"
+                  value={item.costPrice}
+                  onChange={e => updateItem(index, "costPrice", e.target.value)}
+                  style={{ fontSize: "0.8125rem", background: "var(--color-surface)" }}
+                />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   {item.quantity && item.unitPrice ? (
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -246,12 +246,36 @@ export default function OrderForm() {
           <textarea className="input" rows={2} placeholder="Special instructions..." value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
 
-        {/* SUBMIT */}
-        <div style={{ display: "flex", gap: 10, paddingBottom: 8 }}>
-          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate(-1)}>Cancel</button>
-          <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={loading}>{loading ? "Creating…" : "Create Order"}</button>
+        {/* SUBMIT — two buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={loading}
+            onClick={() => handleSubmit(false)}
+          >
+            {loading ? "Creating…" : "Create Order"}
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => handleSubmit(true)}
+            style={{
+              width: "100%", padding: "13px",
+              background: "#F5F3FF", color: "#6D28D9",
+              border: "1.5px solid #DDD6FE",
+              borderRadius: "var(--radius-lg)",
+              fontSize: "0.9375rem", fontWeight: 600,
+              cursor: "pointer", fontFamily: "var(--font-sans)",
+            }}
+          >
+            {loading ? "Saving…" : "Save as Quote"}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
+            Cancel
+          </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

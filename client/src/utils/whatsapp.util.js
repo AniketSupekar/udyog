@@ -9,9 +9,7 @@ const formatINR = (amount = 0) =>
 
 const formatDate = (date) =>
   new Date(date).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+    day: "numeric", month: "short", year: "numeric",
   });
 
 const openWhatsApp = (phone, lines) => {
@@ -33,13 +31,39 @@ const buildUpiLink = (upiId, businessName, amount) => {
   return `${BACKEND_URL}/api/pay?${params.toString()}`;
 };
 
-// ── Automated footer — appended to every message ──────────────────────────
 const buildFooter = (businessName) => [
   ``,
   `────────────────`,
-  `• This is an automated message from ${businessName}'s order management system.`,
-  // `Powered by Udyog`,
+  `📲 This is an automated message from ${businessName}'s order management system.`,
+  `_Powered by Udyog_`,
 ];
+
+export const getQuotationUrl = (order, businessName) => {
+  const phone = order.clientSnapshot?.phone;
+  if (!phone) return null;
+
+  const itemsList = order.items
+    ?.map((i) => `  * ${i.productName} x ${i.quantity} ${i.unit} — ${formatINR(i.amount)}`)
+    .join("\n") || "  * Items";
+
+  openWhatsApp(phone, [
+    `Hello ${order.clientSnapshot?.name} 👋`,
+    ``,
+    `Here's your quotation from *${businessName}* 📋`,
+    ``,
+    `*Items:*`,
+    `--------------------------------`,
+    itemsList,
+    `--------------------------------`,
+    `*Total Estimate: ${formatINR(order.financial?.total)}*`,
+    ``,
+    `_This is a quotation, not a confirmed order._`,
+    `Reply to confirm and we'll get started! ✅`,
+    ``,
+    `— ${businessName}`,
+    ...buildFooter(businessName),
+  ]);
+};
 
 export const getConfirmationUrl = (order, businessName) => {
   const phone = order.clientSnapshot?.phone;
