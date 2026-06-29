@@ -179,7 +179,7 @@ export default function OrderForm() {
                 <input
                   className="input"
                   type="number"
-                  placeholder="₹ Cost (optional — for profit tracking)"
+                  placeholder="₹ Cost (optional - for profit tracking)"
                   min="0" step="0.01"
                   value={item.costPrice}
                   onChange={e => updateItem(index, "costPrice", e.target.value)}
