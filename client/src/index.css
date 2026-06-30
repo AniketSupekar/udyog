@@ -7,20 +7,20 @@
   --font-sans: 'Inter', sans-serif;
   --font-mono: 'DM Mono', monospace;
 
-  /* Backgrounds */
-  --color-bg: #F7F7F8;
+  /* Backgrounds — warm off-white instead of clinical gray */
+  --color-bg: #F4F3EF;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #FAFAFA;
+  --color-surface-raised: #FAFAF8;
 
   /* Borders */
-  --color-border: #E4E4E7;
-  --color-border-strong: #D1D1D6;
+  --color-border: #E8E6DF;
+  --color-border-strong: #D6D3C9;
 
   /* Text */
-  --color-text-primary: #0F1117;
-  --color-text-secondary: #3A3A3C;
-  --color-text-tertiary: #8A8A8E;
-  --color-text-placeholder: #B0B0B5;
+  --color-text-primary: #16161A;
+  --color-text-secondary: #56564F;
+  --color-text-tertiary: #8A8A85;
+  --color-text-placeholder: #B0B0AB;
 
   /* Accent — indigo, used only for focus/links/interactive states */
   --color-accent: #6366F1;
@@ -28,30 +28,30 @@
   --color-accent-hover: #4F46E5;
 
   /* CTA — charcoal black for primary actions */
-  --color-cta: #0F1117;
-  --color-cta-hover: #18181B;
+  --color-cta: #16161A;
+  --color-cta-hover: #0F0F12;
 
   /* Semantic */
-  --color-danger: #E24B4A;
+  --color-danger: #B91C1C;
   --color-danger-light: #FEF2F2;
-  --color-warning: #D97706;
+  --color-warning: #B45309;
   --color-warning-light: #FFFBEB;
-  --color-success: #16A34A;
+  --color-success: #15803D;
   --color-success-light: #F0FDF4;
-  --color-info: #6366F1;
-  --color-info-light: #EEF2FF;
+  --color-info: #1D4ED8;
+  --color-info-light: #EFF6FF;
 
-  /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+  /* Shadows — reserved only for floating elements (modals, sheets) */
+  --shadow-xs: none;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 10px -2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 12px 28px -6px rgba(0,0,0,0.14);
 
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
   /* Layout */
@@ -86,13 +86,15 @@ body {
   font-family: var(--font-mono);
   font-weight: 500;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .amount-lg {
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1.25rem;
   letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Input ─────────────────────────────────────────────────────────── */
@@ -133,12 +135,12 @@ textarea.input {
   resize: none;
 }
 
-/* ─── Card ──────────────────────────────────────────────────────────── */
+/* ─── Card — flat, no shadow, separation via bg contrast only ────────── */
 .card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 /* ─── Btn ───────────────────────────────────────────────────────────── */
@@ -172,10 +174,9 @@ textarea.input {
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--color-cta-hover);
-  transform: translateY(-1px);
 }
 .btn-primary:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .btn-secondary {
@@ -223,7 +224,7 @@ textarea.input {
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: var(--radius-full);
   font-size: 0.72rem;
   font-weight: 500;
@@ -242,9 +243,9 @@ textarea.input {
 
 .page-title {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-primary);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
@@ -257,8 +258,8 @@ textarea.input {
 /* ─── Section ───────────────────────────────────────────────────────── */
 .section-label {
   font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-placeholder);
   margin-bottom: 10px;
@@ -295,7 +296,7 @@ textarea.input {
 
 /* ─── Skeleton ──────────────────────────────────────────────────────── */
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #ECEAE3 25%, #E2E0D8 50%, #ECEAE3 75%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.4s ease infinite;
   border-radius: var(--radius-sm);
@@ -347,9 +348,10 @@ textarea.input {
   width: 100%;
   max-width: 380px;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-xl);
   padding: 28px 24px;
+  box-shadow: var(--shadow-sm);
 }
 
 .auth-brand {
@@ -372,16 +374,16 @@ textarea.input {
 
 .auth-brand-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-primary);
   letter-spacing: -0.02em;
 }
 
 .auth-heading {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-primary);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   margin-bottom: 3px;
 }
 
@@ -466,7 +468,6 @@ textarea.input {
 .auth-link:hover { text-decoration: underline; }
 
 /* OTP boxes */
-/* OTP boxes — replace existing .otp-grid and .otp-box */
 .otp-grid {
   display: flex;
   gap: 6px;
@@ -476,7 +477,7 @@ textarea.input {
 
 .otp-box {
   flex: 1;
-  min-width: 0;        /* critical — prevents overflow */
+  min-width: 0;
   height: 48px;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);

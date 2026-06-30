@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFullDashboard } from "../services/dashboard.api";
@@ -36,7 +35,7 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* STICKY NAVBAR HEADER */}
+      {/* STICKY NAVBAR — logo only, unchanged */}
       <div style={{
         position: "sticky", top: 0, zIndex: 30,
         background: "var(--color-surface)",
@@ -53,9 +52,14 @@ export default function Dashboard() {
         <NotificationBell />
       </div>
 
-      <div className="page animate-in" style={{ paddingTop: 20 }}>
+      <div className="page animate-in" style={{ paddingTop: 18 }}>
 
-        {/* OUTSTANDING BANNER */}
+        {/* GREETING — its own line, between navbar and outstanding bar */}
+        <p style={{ fontSize: "0.8125rem", color: "var(--color-text-tertiary)", fontWeight: 400, marginBottom: 16 }}>
+          {greeting()}, {user?.name?.split(" ")[0] || "Admin"}
+        </p>
+
+        {/* OUTSTANDING BANNER — colors untouched */}
         {summary?.totalOutstanding > 0 && (
           <button
             onClick={() => navigate("/outstanding")}
@@ -71,8 +75,8 @@ export default function Dashboard() {
                 <IndianRupee size={18} color="var(--color-danger)" />
               </div>
               <div style={{ textAlign: "left" }}>
-                <p style={{ fontSize: "0.75rem", color: "var(--color-danger)", fontWeight: 500 }}>Outstanding Dues</p>
-                <p className="amount" style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-danger)" }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--color-danger)", fontWeight: 500 }}>Outstanding dues</p>
+                <p className="amount" style={{ fontSize: "1.125rem", fontWeight: 500, color: "var(--color-danger)" }}>
                   {formatCurrency(summary.totalOutstanding)}
                 </p>
               </div>
@@ -91,16 +95,14 @@ export default function Dashboard() {
               borderRadius: "var(--radius-lg)", padding: "14px 16px",
               marginBottom: 12, cursor: "pointer", transition: "all 0.15s",
             }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = ""}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 36, height: 36, background: "var(--color-accent)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Store size={18} color="white" />
               </div>
               <div style={{ textAlign: "left" }}>
-                <p style={{ fontSize: "0.75rem", color: "var(--color-accent)", fontWeight: 500 }}>New Store Orders</p>
-                <p style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--color-accent)", fontFamily: "var(--font-mono)" }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--color-accent)", fontWeight: 500 }}>New store orders</p>
+                <p className="amount" style={{ fontSize: "1.125rem", fontWeight: 500, color: "var(--color-accent)" }}>
                   {summary.storefrontNew} order{summary.storefrontNew > 1 ? "s" : ""} to review
                 </p>
               </div>
@@ -114,10 +116,10 @@ export default function Dashboard() {
 
         <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.4)} }`}</style>
 
-        {/* SUMMARY CARDS */}
+        {/* SUMMARY CARDS — flat, no shadow, weight 500 numbers */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
           <SummaryCard
-            label="Due Today" value={summary?.dueToday || 0}
+            label="Due today" value={summary?.dueToday || 0}
             icon={Calendar} iconColor="#B45309" pill="Today" pillBg="#FFFBEB" pillColor="#B45309"
             onClick={() => navigate("/orders?filter=due-today")}
           />
@@ -143,7 +145,7 @@ export default function Dashboard() {
           <OrderSection title="Overdue" icon={<AlertTriangle size={15} color="var(--color-danger)" />} titleColor="var(--color-danger)" orders={overdue} viewAllPath="/orders?filter=overdue" navigate={navigate} />
         )}
         {dueToday?.length > 0 && (
-          <OrderSection title="Due Today" icon={<Calendar size={15} color="var(--color-warning)" />} titleColor="var(--color-warning)" orders={dueToday} viewAllPath="/orders?filter=due-today" navigate={navigate} />
+          <OrderSection title="Due today" icon={<Calendar size={15} color="var(--color-warning)" />} titleColor="var(--color-warning)" orders={dueToday} viewAllPath="/orders?filter=due-today" navigate={navigate} />
         )}
         {upcoming?.length > 0 && (
           <OrderSection title="Upcoming (7 days)" icon={<Clock size={15} color="var(--color-info)" />} titleColor="var(--color-info)" orders={upcoming} viewAllPath="/orders?filter=upcoming" navigate={navigate} />
@@ -152,9 +154,9 @@ export default function Dashboard() {
         {!overdue?.length && !dueToday?.length && !upcoming?.length && (
           <div className="empty-state card" style={{ marginTop: 8 }}>
             <div className="empty-state-icon"><Calendar size={22} color="var(--color-text-tertiary)" /></div>
-            <p style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>All clear today</p>
+            <p style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>All clear today</p>
             <p style={{ fontSize: "0.875rem", marginTop: 4 }}>No orders due, overdue, or upcoming</p>
-            <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => navigate("/orders/create")}>Create First Order</button>
+            <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => navigate("/orders/create")}>Create first order</button>
           </div>
         )}
       </div>
@@ -167,21 +169,21 @@ function SummaryCard({ label, value, icon: Icon, iconColor, pill, pillBg, pillCo
     <button
       onClick={onClick}
       style={{
-        background: "var(--color-surface)", border: "1px solid var(--color-border)",
+        background: "var(--color-surface)", border: "none",
         borderRadius: "var(--radius-lg)", padding: "14px", textAlign: "left",
-        cursor: "pointer", transition: "all 0.15s", boxShadow: "var(--shadow-xs)",
+        cursor: "pointer", transition: "transform 0.15s",
       }}
-      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "var(--shadow-xs)"; }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ""; }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Icon size={17} color={iconColor} />
-        <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: pillColor, background: pillBg, padding: "2px 7px", borderRadius: 4 }}>
+        <span style={{ fontSize: "0.625rem", fontWeight: 500, color: pillColor, background: pillBg, padding: "2px 7px", borderRadius: 5 }}>
           {pill}
         </span>
       </div>
-      <p style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1, fontFamily: "var(--font-mono)" }}>{value}</p>
-      <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--color-text-secondary)", marginTop: 6 }}>{label}</p>
+      <p className="amount" style={{ fontSize: "1.625rem", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1 }}>{value}</p>
+      <p style={{ fontSize: "0.75rem", fontWeight: 400, color: "var(--color-text-tertiary)", marginTop: 6 }}>{label}</p>
     </button>
   );
 }
@@ -192,10 +194,10 @@ function OrderSection({ title, icon, titleColor, orders, viewAllPath, navigate }
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {icon}
-          <span style={{ fontSize: "0.875rem", fontWeight: 600, color: titleColor }}>{title}</span>
+          <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: titleColor }}>{title}</span>
         </div>
-        <button onClick={() => navigate(viewAllPath)} style={{ fontSize: "0.8125rem", color: titleColor, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
-          View all <ChevronRight size={14} />
+        <button onClick={() => navigate(viewAllPath)} style={{ fontSize: "0.75rem", color: titleColor, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+          View all <ChevronRight size={13} />
         </button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -204,26 +206,24 @@ function OrderSection({ title, icon, titleColor, orders, viewAllPath, navigate }
             key={order._id}
             onClick={() => navigate(`/orders/${order._id}`)}
             className="card"
-            style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", cursor: "pointer", border: "1px solid var(--color-border)", transition: "all 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = ""}
+            style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 15px", cursor: "pointer" }}
           >
             <div style={{ textAlign: "left", minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <p style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {order.clientSnapshot?.name}
                 </p>
                 {order.source === "STOREFRONT" && (
-                  <span style={{ flexShrink: 0, fontSize: "0.5625rem", fontWeight: 700, background: "var(--color-accent-light)", color: "var(--color-accent)", padding: "1px 5px", borderRadius: 3, border: "1px solid #C7D2FE" }}>
+                  <span style={{ flexShrink: 0, fontSize: "0.5625rem", fontWeight: 500, background: "var(--color-accent-light)", color: "var(--color-accent)", padding: "1px 5px", borderRadius: 4 }}>
                     STORE
                   </span>
                 )}
               </div>
-              <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)" }}>{formatDate(order.deliveryDate)}</p>
+              <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)" }}>{formatDate(order.deliveryDate)}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <StatusBadge status={order.status} />
-              <ChevronRight size={16} color="var(--color-text-tertiary)" />
+              <ChevronRight size={15} color="var(--color-text-tertiary)" />
             </div>
           </button>
         ))}
