@@ -1,7 +1,8 @@
+// src/services/api.js
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_BASE_URL}/v1`,
+  baseURL: import.meta.env.VITE_API_BASE_URL, // e.g. https://udyog-backend.railway.app/api
   withCredentials: true,
 });
 

@@ -1,3 +1,4 @@
+// src/modules/orders/order.routes.js
 import express from "express";
 import {
   createOrder,
@@ -22,6 +23,6 @@ router.patch("/:id",         updateOrderDetails);
 router.patch("/:id/status",  updateOrderStatus);
 router.patch("/:id/convert", convertQuoteToOrder);
 router.post("/:id/payments", recordPayment);
-router.patch("/:id/delete",  softDeleteOrder);
+router.delete("/:id",        softDeleteOrder);  // fixed: DELETE not PATCH
 
 export default router;
