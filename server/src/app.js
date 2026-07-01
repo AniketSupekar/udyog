@@ -23,7 +23,7 @@ import expenseRoutes       from "./modules/expenses/expense.routes.js";
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { sanitizeInput } from "./middleware/sanitize.middleware.js";
 import { apiLimiter, authLimiter, cronLimiter } from "./middleware/rateLimiter.middleware.js";
-import { createTomorrowDeliveryNotifications } from "./modules/notifications/notification.service.js";
+import { createTomorrowDeliveryNotifications, createOverdueOrderNotifications } from "./modules/notifications/notification.service.js";
 import Business from "./models/Business.js";
 
 connectDB();
@@ -79,15 +79,22 @@ app.use("/api/v1/pay",           payRoutes);
 app.use("/api/v1/store",         storeRoutes);
 app.use("/api/v1/expenses",      expenseRoutes);
 
-app.post("/api/v1/cron/notifications", cronLimiter, async (req, res, next) => {
+app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
   try {
     const businesses = await Business.find({ isActive: true }, "_id");
-    let totalCreated = 0;
+    let deliveryCreated = 0;
+    let overdueCreated = 0;
+ 
     for (const b of businesses) {
-      const r = await createTomorrowDeliveryNotifications(b._id);
-      totalCreated += r.created;
+      const [d, o] = await Promise.all([
+        createTomorrowDeliveryNotifications(b._id),
+        createOverdueOrderNotifications(b._id),
+      ]);
+      deliveryCreated += d.created;
+      overdueCreated += o.created;
     }
-    res.json({ success: true, created: totalCreated });
+ 
+    res.json({ success: true, deliveryCreated, overdueCreated });
   } catch (err) { next(err); }
 });
 

@@ -8,6 +8,7 @@ import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess } from "../../utils/ApiResponse.js";
 import { generateSlug, makeUniqueSlug } from "../../utils/slug.js";
+import { notifyStorefrontOrder } from "../notifications/notification.service.js";
 
 /* ─── GET /api/store/:slug ─────────────────────────────────────────────────────
    Public — returns storefront info + public products
@@ -157,6 +158,13 @@ export const placeStorefrontOrder = asyncHandler(async (req, res) => {
     notes: notes?.trim() || null,
     source: "STOREFRONT",
   });
+
+  notifyStorefrontOrder({
+    businessId: business._id,
+    orderId: order._id,
+    customerName: name.trim(),
+    total,
+  }).catch(() => { });
 
   sendSuccess(res, {
     orderId: order._id,

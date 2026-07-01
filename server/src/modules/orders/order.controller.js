@@ -5,11 +5,12 @@ import asyncHandler from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { sendSuccess, sendCreated, sendPaginated } from "../../utils/ApiResponse.js";
 import { calculateOrderTotals, getPaymentStatus } from "../../utils/calculations.js";
+import { notifyPaymentReceived } from "../../modules/notifications/notification.service.js";
 
 const STATUS_TRANSITIONS = {
-  QUOTE:     ["CREATED", "CANCELLED"],
-  CREATED:   ["PENDING", "CANCELLED"],
-  PENDING:   ["DELIVERED", "CANCELLED"],
+  QUOTE: ["CREATED", "CANCELLED"],
+  CREATED: ["PENDING", "CANCELLED"],
+  PENDING: ["DELIVERED", "CANCELLED"],
   DELIVERED: [],
   CANCELLED: [],
 };
@@ -259,6 +260,15 @@ export const recordPayment = asyncHandler(async (req, res) => {
 
   await order.save();
   await invalidateOrderCache(req.user.businessId);
+
+  notifyPaymentReceived({
+    businessId: req.user.businessId,
+    orderId: order._id,
+    customerName: order.clientSnapshot.name,
+    amount: roundedAmount,
+    isPaid: order.payment.status === "PAID",
+  }).catch(() => { });
+
   sendSuccess(res, order, "Payment recorded successfully");
 });
 
