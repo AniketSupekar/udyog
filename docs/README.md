@@ -2,7 +2,7 @@
 
 Udyog is a mobile-first SaaS application that helps Indian small businesses manage orders, track deliveries, record payments, and send WhatsApp invoices with UPI payment links.
 
-Built to scale across multiple business types — nurseries, textile, retail, food, and any order-driven business.
+Built to scale across multiple business types - nurseries, textile, retail, food, and any order-driven business.
 
 **Production URL:** https://udyog-live.vercel.app  
 **Backend API:** https://udyog-backend-live.vercel.app
