@@ -1,4 +1,6 @@
-const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/, "");
+// src/utils/whatsapp.util.js
+// Strips /api/v1 or /api from base URL to get root backend URL for UPI pay links
+const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api(\/v\d+)?$/, "");
 
 const formatINR = (amount = 0) =>
   new Intl.NumberFormat("en-IN", {

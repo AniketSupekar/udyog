@@ -1,4 +1,3 @@
-// src/modules/clients/client.controller.js
 import Client from "../../models/Client.js";
 import Order from "../../models/Order.js";
 import asyncHandler from "../../utils/asyncHandler.js";
@@ -8,7 +7,7 @@ import { getCache, setCache, delCache } from "../../config/redis.js";
 
 const CACHE_KEY = (businessId) => `clients:list:${businessId}`;
 
-/* ─── GET /api/clients ───────────────────────────────────────────────── */
+/* ─── GET /api/v1/clients ────────────────────────────────────────────── */
 export const getClients = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { search = "", page = 1, limit = 20 } = req.query;
@@ -31,51 +30,43 @@ export const getClients = asyncHandler(async (req, res) => {
   ]);
 
   sendPaginated(res, clients, {
-    page: pageNum,
-    limit: limitNum,
-    total,
+    page: pageNum, limit: limitNum, total,
     totalPages: Math.ceil(total / limitNum),
   });
 });
 
-/* ─── GET /api/clients/search — for autocomplete ─────────────────────── */
+/* ─── GET /api/v1/clients/search ─────────────────────────────────────── */
 export const searchClients = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { q = "" } = req.query;
 
   if (q.trim().length < 1) return sendSuccess(res, []);
 
-  // Try cache first for instant autocomplete
   const cacheKey = CACHE_KEY(businessId);
   const cached = await getCache(cacheKey);
 
   if (cached) {
     const filtered = cached.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q.toLowerCase()) ||
-        c.phone.includes(q)
+      c => c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q)
     );
     return sendSuccess(res, filtered.slice(0, 8));
   }
 
   const clients = await Client.find(
     {
-      businessId,
-      isActive: true,
+      businessId, isActive: true,
       $or: [
         { name: { $regex: q.trim(), $options: "i" } },
         { phone: { $regex: q.trim(), $options: "i" } },
       ],
     },
     { name: 1, phone: 1, address: 1, email: 1 }
-  )
-    .limit(8)
-    .lean();
+  ).limit(8).lean();
 
   sendSuccess(res, clients);
 });
 
-/* ─── POST /api/clients ──────────────────────────────────────────────── */
+/* ─── POST /api/v1/clients ───────────────────────────────────────────── */
 export const createClient = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { name, phone, email, address, type, notes } = req.body;
@@ -83,7 +74,6 @@ export const createClient = asyncHandler(async (req, res) => {
   if (!name?.trim()) throw ApiError.badRequest("Client name is required");
   if (!phone?.trim()) throw ApiError.badRequest("Phone number is required");
 
-  // Check duplicate phone within business
   const existing = await Client.findOne({ businessId, phone: phone.trim() });
   if (existing) throw ApiError.conflict("A client with this phone number already exists");
 
@@ -101,15 +91,15 @@ export const createClient = asyncHandler(async (req, res) => {
   sendCreated(res, client, "Client created successfully");
 });
 
-/* ─── GET /api/clients/:id ───────────────────────────────────────────── */
+/* ─── GET /api/v1/clients/:id ────────────────────────────────────────── */
 export const getClientById = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { id } = req.params;
 
   const [client, orders] = await Promise.all([
     Client.findOne({ _id: id, businessId }).lean(),
-    Order.find({ businessId, "clientSnapshot.phone": { $exists: true }, clientId: id, isDeleted: false })
-      .select("clientSnapshot financial payment status deliveryDate orderDate")
+    Order.find({ businessId, clientId: id, isDeleted: false })
+      .select("clientSnapshot financial payment status deliveryDate orderDate createdAt")
       .sort({ createdAt: -1 })
       .limit(20)
       .lean(),
@@ -117,10 +107,19 @@ export const getClientById = asyncHandler(async (req, res) => {
 
   if (!client) throw ApiError.notFound("Client not found");
 
-  sendSuccess(res, { ...client, recentOrders: orders });
+  // Compute stats from actual orders
+  const stats = orders.reduce((acc, o) => {
+    if (o.status === "CANCELLED") return acc;
+    acc.totalOrders++;
+    acc.totalRevenue += o.financial?.total || 0;
+    acc.totalPaid += o.payment?.totalPaid || 0;
+    return acc;
+  }, { totalOrders: 0, totalRevenue: 0, totalPaid: 0 });
+
+  sendSuccess(res, { ...client, recentOrders: orders, stats });
 });
 
-/* ─── PATCH /api/clients/:id ─────────────────────────────────────────── */
+/* ─── PATCH /api/v1/clients/:id ──────────────────────────────────────── */
 export const updateClient = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { id } = req.params;
@@ -138,11 +137,10 @@ export const updateClient = asyncHandler(async (req, res) => {
 
   await client.save();
   await delCache(CACHE_KEY(businessId));
-
   sendSuccess(res, client, "Client updated");
 });
 
-/* ─── DELETE /api/clients/:id ────────────────────────────────────────── */
+/* ─── DELETE /api/v1/clients/:id ─────────────────────────────────────── */
 export const deleteClient = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { id } = req.params;
@@ -156,4 +154,60 @@ export const deleteClient = asyncHandler(async (req, res) => {
 
   await delCache(CACHE_KEY(businessId));
   sendSuccess(res, null, "Client deleted");
+});
+
+/* ─── GET /api/v1/clients/:id/ledger ─────────────────────────────────── */
+// Returns all orders for a client in chronological order
+// with a running balance so the owner can see the full khata
+export const getClientLedger = asyncHandler(async (req, res) => {
+  const { businessId } = req.user;
+  const { id } = req.params;
+
+  const client = await Client.findOne({ _id: id, businessId }).lean();
+  if (!client) throw ApiError.notFound("Client not found");
+
+  const orders = await Order.find({
+    businessId,
+    clientId: id,
+    isDeleted: false,
+    status: { $ne: "CANCELLED" },
+  })
+    .select("financial payment status deliveryDate orderDate createdAt items notes source")
+    .sort({ createdAt: 1 }) // chronological — oldest first for running balance
+    .lean();
+
+  // Build ledger entries with running balance
+  let runningBalance = 0;
+  const entries = orders.map(order => {
+    const charged = order.financial?.total || 0;
+    const paid = order.payment?.totalPaid || 0;
+    const outstanding = order.payment?.remainingAmount || 0;
+    runningBalance += outstanding;
+
+    return {
+      orderId: order._id,
+      date: order.deliveryDate || order.createdAt,
+      orderDate: order.orderDate,
+      status: order.status,
+      source: order.source,
+      items: order.items,
+      charged,
+      paid,
+      outstanding,
+      runningBalance,
+      paymentStatus: order.payment?.status,
+      transactions: order.payment?.transactions || [],
+      notes: order.notes,
+    };
+  });
+
+  // Summary
+  const summary = {
+    totalCharged: orders.reduce((s, o) => s + (o.financial?.total || 0), 0),
+    totalPaid: orders.reduce((s, o) => s + (o.payment?.totalPaid || 0), 0),
+    totalOutstanding: orders.reduce((s, o) => s + (o.payment?.remainingAmount || 0), 0),
+    totalOrders: orders.length,
+  };
+
+  sendSuccess(res, { client, entries, summary });
 });

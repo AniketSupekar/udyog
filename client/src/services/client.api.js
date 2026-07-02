@@ -15,6 +15,11 @@ export const getClientById = async (id) => {
   return data;
 };
 
+export const getClientLedger = async (id) => {
+  const { data } = await api.get(`/clients/${id}/ledger`);
+  return data.data;
+};
+
 export const createClient = async (payload) => {
   const { data } = await api.post("/clients", payload);
   return data;

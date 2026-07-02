@@ -19,6 +19,7 @@ import clientRoutes        from "./modules/clients/client.routes.js";
 import payRoutes           from "./modules/pay/pay.routes.js";
 import storeRoutes         from "./modules/store/store.routes.js";
 import expenseRoutes       from "./modules/expenses/expense.routes.js";
+import searchRoutes from "./modules/search/search.routes.js";
 
 import { globalErrorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { sanitizeInput } from "./middleware/sanitize.middleware.js";
@@ -78,6 +79,7 @@ app.use("/api/v1/clients",       clientRoutes);
 app.use("/api/v1/pay",           payRoutes);
 app.use("/api/v1/store",         storeRoutes);
 app.use("/api/v1/expenses",      expenseRoutes);
+app.use("/api/v1/search", searchRoutes);
 
 app.post("/api/cron/notifications", cronLimiter, async (req, res, next) => {
   try {

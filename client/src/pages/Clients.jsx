@@ -1,9 +1,9 @@
-// src/pages/Clients.jsx
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { getClients, createClient } from "../services/client.api";
+import { createPortal } from "react-dom";
+import { getClients, createClient, updateClient } from "../services/client.api";
 import { useToast } from "../context/ToastContext";
-import { Search, Plus, X, User, Phone, Building2, ChevronRight } from "lucide-react";
+import { Search, Plus, X, User, ChevronRight } from "lucide-react";
 
 export default function Clients() {
   const navigate = useNavigate();
@@ -83,7 +83,7 @@ export default function Clients() {
           <div className="empty-state-icon">
             <User size={22} color="var(--color-text-tertiary)" />
           </div>
-          <p style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>
+          <p style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>
             {search ? "No clients found" : "No clients yet"}
           </p>
           <p style={{ fontSize: "0.875rem", marginTop: 4 }}>
@@ -103,41 +103,32 @@ export default function Clients() {
                 key={client._id}
                 onClick={() => navigate(`/clients/${client._id}`)}
                 className="card"
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", cursor: "pointer", border: "1px solid var(--color-border)", transition: "all 0.15s", textAlign: "left" }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = ""}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", border: "none" }}
               >
-                {/* Avatar */}
                 <div style={{
                   width: 42, height: 42, borderRadius: "50%",
                   background: "var(--color-accent-light)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                  fontSize: "1rem", fontWeight: 700, color: "var(--color-accent)",
+                  flexShrink: 0, fontSize: "1rem", fontWeight: 500, color: "var(--color-accent)",
                 }}>
                   {client.name[0].toUpperCase()}
                 </div>
-
-                {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <p style={{ fontWeight: 500, fontSize: "0.9375rem", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {client.name}
                   </p>
                   <p style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary)", marginTop: 2 }}>
-                    📞 {client.phone}
+                    {client.phone}
                   </p>
                 </div>
-
-                {/* Stats */}
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <p className="amount" style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  <p className="amount" style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--color-text-primary)" }}>
                     {client.stats?.totalOrders || 0} orders
                   </p>
                   <p style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", marginTop: 2 }}>
                     {client.type}
                   </p>
                 </div>
-
                 <ChevronRight size={16} color="var(--color-text-tertiary)" />
               </button>
             ))}
@@ -154,32 +145,39 @@ export default function Clients() {
       )}
 
       {/* FAB */}
-      <button onClick={() => setShowForm(true)} style={{
-        position: "fixed", bottom: 80, right: 20,
-        width: 56, height: 56,
-        background: "var(--color-accent)", borderRadius: "50%",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 4px 16px rgba(22,163,74,0.4)",
-        border: "none", cursor: "pointer", zIndex: 40,
-      }}>
-        <Plus size={24} color="white" />
+      <button
+        onClick={() => setShowForm(true)}
+        style={{
+          position: "fixed",
+          bottom: "calc(64px + env(safe-area-inset-bottom, 0px) + 8px)",
+          right: 24,
+          width: 52, height: 52,
+          background: "var(--color-cta)", borderRadius: "var(--radius-full)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+          border: "none", cursor: "pointer", zIndex: 40,
+        }}
+      >
+        <Plus size={22} color="white" />
       </button>
 
-      {/* CREATE MODAL */}
-      {showForm && (
+      {/* CREATE MODAL — portaled to body */}
+      {showForm && createPortal(
         <ClientFormModal
           onClose={() => setShowForm(false)}
           onSaved={handleCreated}
-        />
+        />,
+        document.body
       )}
     </div>
   );
 }
 
-// ─── Client Form Modal ────────────────────────────────────────────────
+/* ─── Client Form Modal ──────────────────────────────────────────────── */
 function ClientFormModal({ client, onClose, onSaved }) {
   const { toast } = useToast();
   const isEdit = Boolean(client);
+  const scrollRef = useRef(null);
   const [form, setForm] = useState({
     name: client?.name || "",
     phone: client?.phone || "",
@@ -190,13 +188,16 @@ function ClientFormModal({ client, onClose, onSaved }) {
   });
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     if (!form.phone.trim()) { toast.error("Phone is required"); return; }
     setLoading(true);
     try {
-      const { updateClient } = await import("../services/client.api");
       const result = isEdit
         ? await updateClient(client._id, form)
         : await createClient(form);
@@ -208,47 +209,92 @@ function ClientFormModal({ client, onClose, onSaved }) {
     }
   };
 
+  const field = (label, node) => (
+    <div>
+      <label style={{
+        fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em",
+        textTransform: "uppercase", color: "var(--color-text-tertiary)",
+        display: "block", marginBottom: 6,
+      }}>{label}</label>
+      {node}
+    </div>
+  );
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-      <div className="animate-in" style={{ background: "var(--color-surface)", borderRadius: "var(--radius-xl) var(--radius-xl) 0 0", width: "100%", maxWidth: 480, maxHeight: "90dvh", overflowY: "auto", paddingBottom: "calc(24px + env(safe-area-inset-bottom, 0px))" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 20px 0" }}>
-          <h2 style={{ fontWeight: 700, fontSize: "1.125rem" }}>{isEdit ? "Edit Client" : "Add Client"}</h2>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <label className="section-label">Full Name *</label>
-            <input className="input" placeholder="Customer name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required autoFocus />
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="animate-in"
+        style={{
+          background: "var(--color-surface)",
+          borderRadius: "20px 20px 0 0",
+          width: "100%", maxWidth: 480,
+          maxHeight: "calc(100dvh - 60px)",
+          display: "flex", flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header — fixed, never scrolls */}
+        <div style={{ flexShrink: 0, borderBottom: "1px solid var(--color-border)" }}>
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 10, paddingBottom: 6 }}>
+            <div style={{ width: 36, height: 4, background: "var(--color-border-strong)", borderRadius: 99 }} />
           </div>
-          <div>
-            <label className="section-label">Phone Number *</label>
-            <input className="input" placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
-          </div>
-          <div>
-            <label className="section-label">Email (optional)</label>
-            <input className="input" type="email" placeholder="customer@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-          </div>
-          <div>
-            <label className="section-label">Address (optional)</label>
-            <textarea className="input" rows={2} placeholder="Delivery address" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
-          </div>
-          <div>
-            <label className="section-label">Client Type</label>
-            <select className="input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-              {["INDIVIDUAL","RETAIL","WHOLESALE","CORPORATE","OTHER"].map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="section-label">Notes (optional)</label>
-            <input className="input" placeholder="Internal notes about this client" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
-            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>
-              {loading ? "Saving…" : isEdit ? "Save Changes" : "Add Client"}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px 14px" }}>
+            <h2 style={{ fontWeight: 500, fontSize: "1rem", color: "var(--color-text-primary)" }}>
+              {isEdit ? "Edit Client" : "Add Client"}
+            </h2>
+            <button
+              onClick={onClose}
+              style={{ width: 30, height: 30, background: "var(--color-bg)", border: "none", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <X size={16} color="var(--color-text-secondary)" />
             </button>
           </div>
-        </form>
+        </div>
+
+        {/* Body — scrollable */}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+          <form onSubmit={handleSubmit} style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" }}>
+
+            {field("Full Name *",
+              <input className="input" placeholder="e.g. Ramesh Textiles" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required autoFocus />
+            )}
+
+            {field("Phone Number *",
+              <input className="input" placeholder="98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
+            )}
+
+            {field("Email (optional)",
+              <input className="input" type="email" placeholder="customer@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            )}
+
+            {field("Address (optional)",
+              <textarea className="input" rows={2} placeholder="Delivery address" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+            )}
+
+            {field("Client Type",
+              <select className="input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+                {["INDIVIDUAL", "RETAIL", "WHOLESALE", "CORPORATE", "OTHER"].map(t => (
+                  <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
+                ))}
+              </select>
+            )}
+
+            {field("Notes (optional)",
+              <input className="input" placeholder="Internal notes about this client" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+            )}
+
+            <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
+              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={loading}>
+                {loading ? "Saving…" : isEdit ? "Save Changes" : "Add Client"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
